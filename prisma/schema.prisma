@@ -1,0 +1,175 @@
+// FILE: prisma/schema.prisma — Student login bang studentCode, them phone/address
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  CONTENT_CREATOR
+  STUDENT
+}
+
+enum ExamStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  FILL_IN_BLANK
+  MATCHING
+  ESSAY
+}
+
+enum NotificationType {
+  SYSTEM_AUTO
+  TEACHER_WARNING
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String?  @unique       // Bat buoc voi Staff, tuy chon voi Student
+  studentCode  String?  @unique       // Ma hoc vien (VD: VS2025001) — chi Student dung
+  passwordHash String
+  fullName     String
+  phone        String?
+  address      String?
+  role         Role
+  avatarUrl    String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  posts         Post[]
+  examAttempts  ExamAttempt[]
+  notifications Notification[]
+
+  @@index([role])
+  @@index([isActive])
+  @@index([studentCode])
+  @@map("users")
+}
+
+model Post {
+  id           String   @id @default(uuid())
+  authorId     String
+  author       User     @relation(fields: [authorId], references: [id])
+  title        String
+  slug         String   @unique
+  excerpt      String?  @db.Text
+  content      String   @db.LongText
+  thumbnailUrl String?
+  tags         Json     @default("[]")
+  status       String   @default("DRAFT")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([authorId])
+  @@index([status])
+  @@index([slug])
+  @@map("posts")
+}
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String
+  description String?    @db.Text
+  parentId    String?
+  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryTree")
+  exams       Exam[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+model Exam {
+  id          String     @id @default(uuid())
+  categoryId  String
+  category    Category   @relation(fields: [categoryId], references: [id])
+  title       String
+  description String?    @db.Text
+  duration    Int
+  totalScore  Float
+  status      ExamStatus @default(DRAFT)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  questions    Question[]
+  examAttempts ExamAttempt[]
+
+  @@index([categoryId])
+  @@index([status])
+  @@map("exams")
+}
+
+model Question {
+  id            String       @id @default(uuid())
+  examId        String
+  exam          Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  type          QuestionType
+  content       String       @db.Text
+  mediaUrl      String?
+  options       Json?
+  correctAnswer Json
+  explanation   String?      @db.Text
+  orderIndex    Int          @default(0)
+  score         Float        @default(1)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([examId])
+  @@index([type])
+  @@map("questions")
+}
+
+model ExamAttempt {
+  id           String        @id @default(uuid())
+  studentId    String
+  student      User          @relation(fields: [studentId], references: [id])
+  examId       String
+  exam         Exam          @relation(fields: [examId], references: [id])
+  startTime    DateTime      @default(now())
+  endTime      DateTime?
+  status       AttemptStatus @default(IN_PROGRESS)
+  answers      Json?
+  studentNotes Json?
+  score        Float?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([studentId])
+  @@index([examId])
+  @@index([status])
+  @@index([studentId, examId])
+  @@map("exam_attempts")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  title     String
+  message   String           @db.Text
+  isRead    Boolean          @default(false)
+  type      NotificationType
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@map("notifications")
+}
