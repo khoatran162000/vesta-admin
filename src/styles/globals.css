@@ -1,0 +1,105 @@
+/**
+ * FILE: globals.css
+ * PATH: apps/admin/src/styles/globals.css
+ * MÔ TẢ: Tailwind v4 theme cho Admin Portal
+ */
+
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --color-royal: #1B2A5B;
+  --color-royal-mid: #243778;
+  --color-royal-light: #2E4494;
+  --color-navy: #0F1B3D;
+  --color-gold: #C9A84C;
+  --color-gold-light: #E8D48B;
+  --color-silver: #B8C0CC;
+  --color-silver-light: #D8DCE4;
+  --color-cream: #FAF8F3;
+  --color-cream-dark: #F0EDE5;
+  --color-muted: #5A6178;
+  --color-danger: #DC2626;
+  --color-success: #16A34A;
+
+  --font-display: var(--font-cormorant), "Cormorant Garamond", serif;
+  --font-body: var(--font-montserrat), "Montserrat", sans-serif;
+}
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-body);
+    background-color: var(--color-cream);
+    color: #1a1a2e;
+    line-height: 1.6;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    color: var(--color-navy);
+    transition: all 0.2s;
+    background: linear-gradient(135deg, var(--color-gold), var(--color-gold-light));
+    box-shadow: 0 2px 8px rgba(201, 168, 76, 0.25);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(201, 168, 76, 0.35); }
+  .btn-primary:disabled { opacity: 0.5; transform: none; }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-silver);
+    color: var(--color-muted);
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover { border-color: var(--color-royal); color: var(--color-royal); background: var(--color-cream); }
+
+  .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
+    color: white;
+    background: var(--color-danger);
+    transition: all 0.2s;
+  }
+  .btn-danger:hover { opacity: 0.9; }
+
+  .input-field {
+    width: 100%;
+    border-radius: 0.5rem;
+    border: 1px solid color-mix(in srgb, var(--color-silver) 40%, transparent);
+    background: var(--color-cream);
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .input-field:focus {
+    border-color: var(--color-gold);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-gold) 20%, transparent);
+  }
+
+  .card {
+    background: white;
+    border: 1px solid color-mix(in srgb, var(--color-silver) 30%, transparent);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+  }
+}
