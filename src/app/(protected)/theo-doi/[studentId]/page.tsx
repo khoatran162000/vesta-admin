@@ -43,6 +43,7 @@ export default function StudentDetailPage() {
           <span className={`rounded-full px-3 py-1 text-xs font-semibold ${student.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
             {student.isActive ? "Hoạt động" : "Đã khoá"}
           </span>
+          <Link href={`/theo-doi/${studentId}/vo-ghi`} className="btn-primary text-xs">📝 Vở ghi & Nhận xét</Link>
           <Link href={`/tai-khoan/${studentId}`} className="btn-secondary text-xs">Sửa thông tin</Link>
         </div>
       </div>

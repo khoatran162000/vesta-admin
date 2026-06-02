@@ -1,9 +1,11 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Users, BookOpen, GraduationCap, Bell, UserCircle, LogOut, ChevronDown } from "lucide-react";
+import {
+  LayoutDashboard, Users, BookOpen, GraduationCap, Bell, UserCircle,
+  LogOut, ChevronDown, Calendar, FileText, Target, BarChart3,
+} from "lucide-react";
 import { useAuth, ROLE_LABELS } from "@/hooks/useAuth";
 
 type NavLink = { href: string; label: string; icon: any };
@@ -16,12 +18,22 @@ const NAV: NavItem[] = [
     { href: "/tai-khoan/giao-vien", label: "Giáo viên" },
     { href: "/tai-khoan/marketing", label: "Marketing" },
     { href: "/tai-khoan/hoc-vien", label: "Học viên" },
+    { href: "/tai-khoan/hoc-vien/tao-hang-loat", label: "Tạo HV hàng loạt" },
+  ]},
+  { label: "Lớp học", icon: Calendar, children: [
+    { href: "/lop-hoc", label: "Nội dung lớp" },
+    { href: "/lich-hoc", label: "Lịch học cả năm" },
   ]},
   { label: "Ngân hàng đề", icon: BookOpen, children: [
     { href: "/ngan-hang-de/categories", label: "Danh mục" },
     { href: "/ngan-hang-de/de-thi", label: "Đề thi" },
   ]},
+  { label: "Nội dung", icon: FileText, children: [
+    { href: "/bai-viet", label: "Bài viết Blog" },
+    { href: "/bai-tap", label: "Bài tập tương tác" },
+  ]},
   { href: "/theo-doi", label: "Theo dõi học viên", icon: GraduationCap },
+  { href: "/bao-cao", label: "Báo cáo kết quả", icon: BarChart3 },
   { href: "/thong-bao", label: "Thông báo", icon: Bell },
   { href: "/ho-so", label: "Hồ sơ", icon: UserCircle },
 ];
@@ -69,7 +81,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           {NAV.map((item) => {
             if ("href" in item) {
               const link = item as NavLink;
-              const active = pathname.startsWith(link.href);
+              const active = pathname === link.href || pathname.startsWith(link.href + "/");
               return (
                 <Link key={link.href} href={link.href}
                   className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-[0.82rem] font-medium transition-colors ${active ? "bg-royal/8 text-royal" : "text-muted hover:bg-cream hover:text-royal"}`}>
@@ -79,7 +91,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             }
             const group = item as NavGroup;
             const isOpen = openMenus.includes(group.label);
-            const hasActive = group.children.some((c) => pathname.startsWith(c.href));
+            const hasActive = group.children.some((c) => pathname === c.href || pathname.startsWith(c.href + "/"));
             return (
               <div key={group.label}>
                 <button onClick={() => toggleMenu(group.label)}
@@ -91,7 +103,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
                 {(isOpen || hasActive) && (
                   <div className="ml-7 mt-0.5 space-y-0.5 border-l border-silver/20 pl-3">
                     {group.children.map((child) => {
-                      const active = pathname.startsWith(child.href);
+                      const active = pathname === child.href || pathname.startsWith(child.href + "/");
                       return (
                         <Link key={child.href} href={child.href}
                           className={`block rounded-md px-2.5 py-1.5 text-[0.78rem] transition-colors ${active ? "font-semibold text-royal" : "text-muted hover:text-royal"}`}>

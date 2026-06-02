@@ -1,157 +1,86 @@
-// FILE: src/app/(protected)/dashboard/page.tsx — Dashboard nang cao
+// FILE: src/app/(protected)/dashboard/page.tsx — Dashboard mới (ghi đè)
 "use client";
-
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, BookOpen, FileText, GraduationCap, AlertTriangle, Clock, Eye } from "lucide-react";
+import {
+  Users, FileText, ClipboardList, Calendar, Target, BarChart3,
+  UserPlus, Upload, ArrowRight, Loader2,
+} from "lucide-react";
 import { api } from "@/lib/api";
 
-interface Stats {
-  teachers: number; students: number; exams: number; posts: number;
-}
-
 export default function DashboardPage() {
-  const [stats, setStats] = useState<Stats>({ teachers: 0, students: 0, exams: 0, posts: 0 });
-  const [recentAttempts, setRecentAttempts] = useState<any[]>([]);
-  const [inactiveStudents, setInactiveStudents] = useState<any[]>([]);
+  const [stats, setStats] = useState({ students: 0, posts: 0, exams: 0, schedules: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [t, s, e, p] = await Promise.all([
-          api.get("/users?role=TEACHER&limit=1"),
+        const [users, posts, exams, schedules] = await Promise.all([
           api.get("/users?role=STUDENT&limit=1"),
-          api.get("/exams?limit=1"),
           api.get("/posts/admin/all?limit=1"),
+          api.get("/exams?limit=1"),
+          api.get("/schedule"),
         ]);
         setStats({
-          teachers: t.meta?.total || 0,
-          students: s.meta?.total || 0,
-          exams: e.meta?.total || 0,
-          posts: p.meta?.total || 0,
+          students: users.meta?.total || 0,
+          posts: posts.meta?.total || (Array.isArray(posts.data) ? posts.data.length : 0),
+          exams: exams.meta?.total || (Array.isArray(exams.data) ? exams.data.length : 0),
+          schedules: Array.isArray(schedules.data) ? schedules.data.length : 0,
         });
-
-        // Recent attempts
-        const attemptsData = await api.get("/attempts?limit=10&status=SUBMITTED");
-        if (attemptsData.success) setRecentAttempts(attemptsData.data);
-
-        // Find inactive students (check all students)
-        const allStudents = await api.get("/users?role=STUDENT&limit=100");
-        if (allStudents.success) {
-          const inactive: any[] = [];
-          for (const student of allStudents.data.slice(0, 20)) {
-            try {
-              const statsData = await api.get(`/attempts/student/${student.id}/stats`);
-              if (statsData.success && statsData.data.stats.daysSinceLastActivity >= 7) {
-                inactive.push({
-                  ...student,
-                  daysSinceLastActivity: statsData.data.stats.daysSinceLastActivity,
-                });
-              }
-            } catch {}
-          }
-          setInactiveStudents(inactive);
-        }
       } catch {} finally { setLoading(false); }
     }
     load();
   }, []);
 
-  const cards = [
-    { label: "Giáo viên", value: stats.teachers, icon: Users, color: "bg-blue-50 text-blue-600", href: "/tai-khoan/giao-vien" },
-    { label: "Học viên", value: stats.students, icon: GraduationCap, color: "bg-green-50 text-green-600", href: "/tai-khoan/hoc-vien" },
-    { label: "Đề thi", value: stats.exams, icon: BookOpen, color: "bg-purple-50 text-purple-600", href: "/ngan-hang-de/de-thi" },
-    { label: "Bài viết", value: stats.posts, icon: FileText, color: "bg-amber-50 text-amber-600", href: "/ngan-hang-de/categories" },
+  const STAT_CARDS = [
+    { icon: Users, label: "Học viên", value: stats.students, color: "#0F1B3D", href: "/tai-khoan/hoc-vien" },
+    { icon: FileText, label: "Bài viết", value: stats.posts, color: "#C9A84C", href: "/bai-viet" },
+    { icon: ClipboardList, label: "Đề thi", value: stats.exams, color: "#22c55e", href: "/ngan-hang-de/de-thi" },
+    { icon: Calendar, label: "Lớp học", value: stats.schedules, color: "#C93040", href: "/lich-hoc" },
+  ];
+
+  const QUICK_ACTIONS = [
+    { icon: UserPlus, label: "Tạo học viên hàng loạt", href: "/tai-khoan/hoc-vien/tao-hang-loat", color: "#0F1B3D" },
+    { icon: Upload, label: "Import CSV học viên", href: "/tai-khoan/hoc-vien/import", color: "#2563eb" },
+    { icon: Target, label: "Tạo bài tập tương tác", href: "/bai-tap/tao-moi", color: "#7c3aed" },
+    { icon: Calendar, label: "Thêm lịch học", href: "/lich-hoc", color: "#C93040" },
+    { icon: FileText, label: "Quản lý nội dung lớp", href: "/lop-hoc", color: "#059669" },
+    { icon: BarChart3, label: "Xem báo cáo kết quả", href: "/bao-cao", color: "#C9A84C" },
   ];
 
   return (
     <div className="mx-auto max-w-[1100px]">
-      <h1 className="mb-6 font-display text-3xl font-bold text-royal">Dashboard</h1>
+      <h1 className="mb-1 font-display text-3xl font-bold text-royal">Dashboard</h1>
+      <p className="mb-6 text-sm text-muted">Tổng quan hệ thống VESTA UNI</p>
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-        {cards.map((c) => (
-          <Link key={c.label} href={c.href} className="card flex items-center gap-4 transition-all hover:-translate-y-0.5 hover:shadow-md">
-            <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${c.color}`}><c.icon size={22} /></div>
-            <div><p className="text-2xl font-bold text-[#1a1a2e]">{c.value}</p><p className="text-sm text-muted">{c.label}</p></div>
+      {/* Stats */}
+      <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {STAT_CARDS.map((s, i) => (
+          <Link key={i} href={s.href} className="card group transition-all hover:-translate-y-0.5 hover:shadow-md">
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg" style={{ background: `${s.color}15` }}>
+              <s.icon size={20} style={{ color: s.color }} />
+            </div>
+            <p className="text-2xl font-bold text-[#1a1a2e]">
+              {loading ? <Loader2 size={20} className="animate-spin text-muted" /> : s.value}
+            </p>
+            <p className="text-xs text-muted">{s.label}</p>
           </Link>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Recent attempts — 2 cols */}
-        <div className="lg:col-span-2">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-display text-lg font-bold text-royal">Bài thi gần đây</h2>
-            <Link href="/theo-doi" className="text-xs font-medium text-gold hover:text-gold-light">Xem tất cả →</Link>
-          </div>
-          <div className="card !p-0 overflow-hidden">
-            {loading ? (
-              <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-3 border-gold border-t-transparent" /></div>
-            ) : recentAttempts.length === 0 ? (
-              <p className="py-12 text-center text-sm text-muted">Chưa có bài thi nào được nộp.</p>
-            ) : (
-              <table className="w-full text-left text-sm">
-                <thead><tr className="border-b border-silver/20 bg-cream">
-                  <th className="px-4 py-2.5 text-xs font-semibold text-royal">Học viên</th>
-                  <th className="px-4 py-2.5 text-xs font-semibold text-royal">Đề thi</th>
-                  <th className="px-4 py-2.5 text-xs font-semibold text-royal">Điểm</th>
-                  <th className="px-4 py-2.5 text-xs font-semibold text-royal">Ngày</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold text-royal"></th>
-                </tr></thead>
-                <tbody>{recentAttempts.slice(0, 8).map((a) => (
-                  <tr key={a.id} className="border-b border-silver/10 hover:bg-cream/50">
-                    <td className="px-4 py-2.5 text-xs font-medium text-[#1a1a2e]">{a.student?.fullName}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted">{a.exam?.title}</td>
-                    <td className="px-4 py-2.5">
-                      {a.score !== null ? (
-                        <span className={`text-xs font-semibold ${a.score >= a.exam?.totalScore * 0.7 ? "text-green-600" : a.score >= a.exam?.totalScore * 0.5 ? "text-amber-600" : "text-red-500"}`}>
-                          {a.score}/{a.exam?.totalScore}
-                        </span>
-                      ) : <span className="text-xs text-muted">—</span>}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-muted">{new Date(a.createdAt).toLocaleDateString("vi-VN")}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      <Link href={`/theo-doi/${a.student?.id}/bai-lam/${a.id}`} className="rounded p-1 text-muted hover:text-royal"><Eye size={13} /></Link>
-                    </td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            )}
-          </div>
-        </div>
-
-        {/* Inactive students — 1 col */}
-        <div>
-          <div className="mb-3 flex items-center gap-2">
-            <AlertTriangle size={16} className="text-amber-500" />
-            <h2 className="font-display text-lg font-bold text-royal">Cần nhắc nhở</h2>
-          </div>
-          <div className="card !p-0 overflow-hidden">
-            {loading ? (
-              <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-3 border-gold border-t-transparent" /></div>
-            ) : inactiveStudents.length === 0 ? (
-              <div className="py-8 text-center">
-                <p className="text-sm text-green-600 font-medium">Tất cả học viên đều hoạt động tốt!</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-silver/10">
-                {inactiveStudents.map((s) => (
-                  <Link key={s.id} href={`/theo-doi/${s.id}`} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-cream/50">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-50 text-xs font-bold text-amber-600">
-                      {s.daysSinceLastActivity}d
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-medium text-[#1a1a2e]">{s.fullName}</p>
-                      <p className="truncate text-[0.65rem] text-muted">{s.daysSinceLastActivity} ngày không hoạt động</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+      {/* Quick actions */}
+      <h3 className="mb-4 font-display text-lg font-bold text-royal">Thao tác nhanh</h3>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {QUICK_ACTIONS.map((a, i) => (
+          <Link key={i} href={a.href}
+            className="card group flex items-center gap-4 transition-all hover:-translate-y-0.5 hover:shadow-md">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg" style={{ background: `${a.color}15` }}>
+              <a.icon size={20} style={{ color: a.color }} />
+            </div>
+            <span className="flex-1 text-sm font-medium text-[#1a1a2e]">{a.label}</span>
+            <ArrowRight size={16} className="text-muted opacity-0 transition-opacity group-hover:opacity-100" />
+          </Link>
+        ))}
       </div>
     </div>
   );
