@@ -33,7 +33,10 @@ const NAV: NavItem[] = [
     { href: "/bai-tap", label: "Bài tập tương tác" },
   ]},
   { href: "/theo-doi", label: "Theo dõi học viên", icon: GraduationCap },
-  { href: "/bao-cao", label: "Báo cáo kết quả", icon: BarChart3 },
+  { label: "Báo cáo", icon: BarChart3, children: [
+    { href: "/bao-cao", label: "Tổng hợp điểm" },
+    { href: "/bao-cao/dinh-ky", label: "Báo cáo định kỳ" },
+  ] },
   { href: "/thong-bao", label: "Thông báo", icon: Bell },
   { href: "/ho-so", label: "Hồ sơ", icon: UserCircle },
 ];
