@@ -36,6 +36,7 @@ const NAV: NavItem[] = [
   { label: "Báo cáo", icon: BarChart3, children: [
     { href: "/bao-cao", label: "Tổng hợp điểm" },
     { href: "/bao-cao/dinh-ky", label: "Báo cáo định kỳ" },
+    { href: "/bao-cao/cuoi-khoa", label: "Báo cáo cuối khóa" },
   ] },
   { href: "/thong-bao", label: "Thông báo", icon: Bell },
   { href: "/ho-so", label: "Hồ sơ", icon: UserCircle },
