@@ -1,4 +1,4 @@
-// FILE: src/app/(protected)/bai-tap/tao-moi/page.tsx — Chọn loại bài tập tương tác
+// FILE: src/app/(protected)/bai-tap/tao-moi/gap/page.tsx — Editor bài GAP (LearnClick)
 "use client";
 import Link from "next/link";
 import { ArrowLeft, TextCursorInput, ListChecks, ArrowLeftRight } from "lucide-react";

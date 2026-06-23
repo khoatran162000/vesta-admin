@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Plus, Trash2, Loader2, Eye, EyeOff, PenTool } from "lucide-react";
+import { Plus, Trash2, Loader2, Eye, EyeOff, PenTool, BarChart3 } from "lucide-react";
 import { api } from "@/lib/api";
 
 const VIS_LABELS: Record<string, { label: string; color: string }> = {
@@ -83,8 +83,9 @@ export default function ExerciseListPage() {
                       </button>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Link href={`/bai-tap/${ex.id}`} className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><PenTool size={14} /></Link>
-                      <button onClick={() => handleDelete(ex.id)} className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+                      <Link href={`/bai-tap/${ex.id}/thong-ke`} title="Thống kê" className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><BarChart3 size={14} /></Link>
+                      <Link href={`/bai-tap/${ex.id}`} title="Sửa" className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><PenTool size={14} /></Link>
+                      <button onClick={() => handleDelete(ex.id)} title="Xoá" className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
                     </td>
                   </tr>
                 );
