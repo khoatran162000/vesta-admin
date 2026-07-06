@@ -34,6 +34,7 @@ const NAV: NavItem[] = [
     { href: "/giao-vien", label: "Đội ngũ giáo viên" },
     { href: "/khoa-hoc", label: "Khoá học" },
     { href: "/sach", label: "Sách & Giáo trình" },
+    { href: "/noi-dung-trang-chu", label: "Nội dung trang chủ" },
   ]},
   { href: "/theo-doi", label: "Theo dõi học viên", icon: GraduationCap },
   { label: "Báo cáo", icon: BarChart3, children: [
