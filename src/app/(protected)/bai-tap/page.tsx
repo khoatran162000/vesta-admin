@@ -4,38 +4,31 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Plus, Trash2, Loader2, Eye, EyeOff, PenTool, BarChart3 } from "lucide-react";
 import { api } from "@/lib/api";
-
 const VIS_LABELS: Record<string, { label: string; color: string }> = {
   PUBLIC: { label: "Công khai", color: "bg-green-50 text-green-700" },
   STUDENT: { label: "Học viên", color: "bg-blue-50 text-blue-700" },
   TEACHER: { label: "Giáo viên", color: "bg-purple-50 text-purple-700" },
   CLASS: { label: "Theo lớp", color: "bg-amber-50 text-amber-700" },
 };
-
 export default function ExerciseListPage() {
   const [exercises, setExercises] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => { loadData(); }, []);
-
   async function loadData() {
     setLoading(true);
     const json = await api.get("/interactive");
     setExercises(json.data || []);
     setLoading(false);
   }
-
   async function togglePublish(ex: any) {
     await api.put(`/interactive/${ex.id}`, { isPublished: !ex.isPublished });
     loadData();
   }
-
   async function handleDelete(id: string) {
     if (!confirm("Xác nhận xoá bài tập này?")) return;
     await api.delete(`/interactive/${id}`);
     loadData();
   }
-
   return (
     <div className="mx-auto max-w-[1100px]">
       <div className="mb-6 flex items-center justify-between">
@@ -47,7 +40,6 @@ export default function ExerciseListPage() {
           <Plus size={16} />Tạo bài tập
         </Link>
       </div>
-
       <div className="overflow-hidden rounded-xl border border-silver/30 bg-white">
         {loading ? (
           <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-gold" /></div>
@@ -66,12 +58,13 @@ export default function ExerciseListPage() {
             <tbody>
               {exercises.map((ex) => {
                 const qs = typeof ex.questions === "string" ? JSON.parse(ex.questions) : ex.questions;
+                const count = typeof ex.questionCount === "number" ? ex.questionCount : (Array.isArray(qs) ? qs.length : 0);
                 const vis = VIS_LABELS[ex.visibility] || VIS_LABELS.PUBLIC;
                 return (
                   <tr key={ex.id} className="border-b border-silver/10 hover:bg-cream/50">
                     <td className="px-4 py-3 font-medium text-[#1a1a2e]">{ex.title}</td>
                     <td className="px-4 py-3"><span className="rounded bg-cream px-2 py-0.5 text-xs text-muted">{ex.type}</span></td>
-                    <td className="px-4 py-3 text-muted">{Array.isArray(qs) ? qs.length : 0}</td>
+                    <td className="px-4 py-3 text-muted">{count}</td>
                     <td className="px-4 py-3">
                       <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${vis.color}`}>{vis.label}</span>
                       {ex.visibility === "CLASS" && ex.visibleTo && <span className="ml-1 text-xs text-muted">({ex.visibleTo})</span>}
@@ -84,7 +77,7 @@ export default function ExerciseListPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Link href={`/bai-tap/${ex.id}/thong-ke`} title="Thống kê" className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><BarChart3 size={14} /></Link>
-                      <Link href={`/bai-tap/${ex.id}`} title="Sửa" className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><PenTool size={14} /></Link>
+                      <Link href={`/bai-tap/${ex.id}/sua`} title="Sửa" className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><PenTool size={14} /></Link>
                       <button onClick={() => handleDelete(ex.id)} title="Xoá" className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
                     </td>
                   </tr>
