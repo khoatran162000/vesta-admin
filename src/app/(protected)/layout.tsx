@@ -31,6 +31,7 @@ const NAV: NavItem[] = [
   { label: "Nội dung", icon: FileText, children: [
     { href: "/bai-viet", label: "Bài viết Blog" },
     { href: "/bai-tap", label: "Bài tập tương tác" },
+    { href: "/giao-vien", label: "Đội ngũ giáo viên" },
   ]},
   { href: "/theo-doi", label: "Theo dõi học viên", icon: GraduationCap },
   { label: "Báo cáo", icon: BarChart3, children: [
