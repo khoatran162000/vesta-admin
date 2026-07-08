@@ -1,18 +1,18 @@
-// FILE: src/app/(protected)/bao-cao/dinh-ky/[id]/page.tsx — Sửa báo cáo định kỳ
+// FILE: src/app/(protected)/bao-cao/dinh-ky/[id]/page.tsx — Sửa báo cáo định kỳ (Biểu mẫu / Dán HTML)
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Save, Send, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Send, Loader2, LayoutGrid, Code } from "lucide-react";
 import { api } from "@/lib/api";
 import ReportGrid, { ReportGridData, makeEmptyGrid } from "@/components/report/ReportGrid";
-
+import HtmlReportEditor from "@/components/report/HtmlReportEditor";
 export default function EditReportPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
-
   const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<"form" | "html">("form");
   const [studentName, setStudentName] = useState("");
   const [studentCode, setStudentCode] = useState("");
   const [course, setCourse] = useState("");
@@ -23,11 +23,10 @@ export default function EditReportPage() {
   const [dataTo, setDataTo] = useState("");
   const [grid, setGrid] = useState<ReportGridData>(makeEmptyGrid());
   const [note, setNote] = useState({ strengths: "", reminders: "", homework: "", attitude: "" });
+  const [html, setHtml] = useState("");
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
-  // cắt ISO date "2026-06-08T00:00:00.000Z" → "2026-06-08" cho input[type=date]
   const toDateInput = (d: string | null) => (d ? d.slice(0, 10) : "");
-
   useEffect(() => {
     (async () => {
       const data = await api.get(`/reports/${id}`);
@@ -41,6 +40,9 @@ export default function EditReportPage() {
         setPeriodTo(toDateInput(r.periodTo));
         setDataFrom(toDateInput(r.dataFrom));
         setDataTo(toDateInput(r.dataTo));
+        setHtml(r.html || "");
+        setShareUrl(r.shareUrl || null);
+        setMode(r.html && r.html.trim() ? "html" : "form");
         if (r.grid && Array.isArray(r.grid.units)) setGrid(r.grid);
         if (r.teacherNote) setNote({
           strengths: r.teacherNote.strengths || "",
@@ -55,34 +57,38 @@ export default function EditReportPage() {
       setLoading(false);
     })();
   }, [id, router]);
-
   async function handleSave(status: "DRAFT" | "PUBLISHED") {
+    if (mode === "html" && !html.trim()) return alert("Vui lòng dán mã HTML của report");
     setSaving(true);
-    const data = await api.put(`/reports/${id}`, {
+    const payload: any = {
       course, learnclickUser, padletAccount,
-      periodTo: periodTo || null,
-      dataFrom: dataFrom || null,
-      dataTo: dataTo || null,
-      grid,
-      teacherNote: note,
+      periodTo: periodTo || null, dataFrom: dataFrom || null, dataTo: dataTo || null,
       status,
-    });
+    };
+    if (mode === "html") {
+      payload.html = html;
+      payload.grid = null;
+    } else {
+      payload.html = "";
+      payload.grid = grid;
+      payload.teacherNote = note;
+    }
+    const data = await api.put(`/reports/${id}`, payload);
     setSaving(false);
-    if (data.success) router.push("/bao-cao/dinh-ky");
-    else alert(data.message || "Lỗi cập nhật báo cáo");
+    if (data.success) {
+      setShareUrl(data.data?.shareUrl || null);
+      router.push("/bao-cao/dinh-ky");
+    } else alert(data.message || "Lỗi cập nhật báo cáo");
   }
-
   const NOTE_FIELDS: { key: keyof typeof note; label: string; placeholder: string }[] = [
     { key: "strengths", label: "Điểm mạnh", placeholder: "Những điểm học sinh làm tốt..." },
     { key: "reminders", label: "Nhắc nhở cần xử lý ngay", placeholder: "Vấn đề cần khắc phục sớm..." },
     { key: "homework", label: "Bài tập về nhà", placeholder: "Giao bài, link cần hoàn thành..." },
     { key: "attitude", label: "Thái độ học tập & ghi bài", placeholder: "Nhận xét thái độ, ghi chép..." },
   ];
-
   if (loading) {
     return <div className="flex items-center justify-center py-20"><Loader2 size={28} className="animate-spin text-gold" /></div>;
   }
-
   return (
     <div className="mx-auto max-w-[1200px]">
       <Link href="/bao-cao/dinh-ky" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-royal">
@@ -90,7 +96,6 @@ export default function EditReportPage() {
       </Link>
       <h2 className="mb-1 font-display text-2xl font-bold text-royal">✏️ Sửa Báo Cáo Định Kỳ</h2>
       <p className="mb-6 text-sm text-muted">{studentName} {studentCode ? `(${studentCode})` : ""}</p>
-
       {/* Thông tin chung */}
       <div className="card mb-6">
         <h3 className="mb-4 font-display text-lg font-bold text-royal">Thông tin chung</h3>
@@ -123,28 +128,46 @@ export default function EditReportPage() {
           </div>
         </div>
       </div>
-
-      {/* Lưới điểm */}
+      {/* Chọn kiểu nhập */}
       <div className="card mb-6">
-        <h3 className="mb-1 font-display text-lg font-bold text-royal">Theo dõi LearnClick theo lộ trình</h3>
-        <p className="mb-4 text-sm text-muted">Bấm vào ô để thêm bài và nhập điểm.</p>
-        <ReportGrid value={grid} onChange={setGrid} />
-      </div>
-
-      {/* Nhận xét */}
-      <div className="card mb-6">
-        <h3 className="mb-4 font-display text-lg font-bold text-royal">Nhận xét của giáo viên</h3>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {NOTE_FIELDS.map((f) => (
-            <div key={f.key}>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">{f.label}</label>
-              <textarea value={note[f.key]} onChange={(e) => setNote({ ...note, [f.key]: e.target.value })}
-                placeholder={f.placeholder} rows={3} className="input-field resize-none" />
-            </div>
-          ))}
+        <h3 className="mb-3 font-display text-lg font-bold text-royal">Kiểu nội dung báo cáo</h3>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setMode("form")}
+            className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold ${mode === "form" ? "border-royal bg-royal text-white" : "border-silver/40 bg-white text-muted hover:border-royal/40"}`}>
+            <LayoutGrid size={16} />Biểu mẫu (nhập theo bảng)
+          </button>
+          <button type="button" onClick={() => setMode("html")}
+            className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold ${mode === "html" ? "border-royal bg-royal text-white" : "border-silver/40 bg-white text-muted hover:border-royal/40"}`}>
+            <Code size={16} />Dán HTML/CSS (như Netlify)
+          </button>
         </div>
       </div>
-
+      {mode === "form" ? (
+        <>
+          <div className="card mb-6">
+            <h3 className="mb-1 font-display text-lg font-bold text-royal">Theo dõi LearnClick theo lộ trình</h3>
+            <p className="mb-4 text-sm text-muted">Bấm vào ô để thêm bài và nhập điểm.</p>
+            <ReportGrid value={grid} onChange={setGrid} />
+          </div>
+          <div className="card mb-6">
+            <h3 className="mb-4 font-display text-lg font-bold text-royal">Nhận xét của giáo viên</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {NOTE_FIELDS.map((f) => (
+                <div key={f.key}>
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">{f.label}</label>
+                  <textarea value={note[f.key]} onChange={(e) => setNote({ ...note, [f.key]: e.target.value })}
+                    placeholder={f.placeholder} rows={3} className="input-field resize-none" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="card mb-6">
+          <h3 className="mb-4 font-display text-lg font-bold text-royal">Nội dung HTML báo cáo</h3>
+          <HtmlReportEditor html={html} onChange={setHtml} shareUrl={shareUrl} />
+        </div>
+      )}
       <div className="flex items-center justify-end gap-3 border-t border-silver/20 pt-6">
         <Link href="/bao-cao/dinh-ky" className="btn-secondary">Huỷ</Link>
         <button onClick={() => handleSave("DRAFT")} disabled={saving} className="btn-secondary">
