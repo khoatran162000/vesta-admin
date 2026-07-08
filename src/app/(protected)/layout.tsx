@@ -21,6 +21,7 @@ const NAV: NavItem[] = [
     { href: "/tai-khoan/hoc-vien/tao-hang-loat", label: "Tạo HV hàng loạt" },
   ]},
   { label: "Lớp học", icon: Calendar, children: [
+    { href: "/lop-hoc-moi", label: "Quản lý lớp học" },
     { href: "/lop-hoc", label: "Nội dung lớp" },
     { href: "/lich-hoc", label: "Lịch học cả năm" },
   ]},
