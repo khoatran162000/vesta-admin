@@ -1,11 +1,12 @@
-// FILE: src/app/(protected)/bao-cao/cuoi-khoa/[id]/page.tsx — Sửa báo cáo cuối khóa
+// FILE: src/app/(protected)/bao-cao/cuoi-khoa/[id]/page.tsx — Sửa báo cáo cuối khóa (Biểu mẫu / Dán HTML)
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Save, Send, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Send, Loader2, LayoutGrid, Code } from "lucide-react";
 import { api } from "@/lib/api";
 import SkillGrid, { SkillGridData, makeEmptySkillGrid } from "@/components/report/SkillGrid";
+import HtmlReportEditor from "@/components/report/HtmlReportEditor";
 
 const SKILL_BANDS = [
   { key: "listening", label: "Nghe (Listening)" },
@@ -14,7 +15,6 @@ const SKILL_BANDS = [
   { key: "speaking", label: "Nói (Speaking)" },
   { key: "overall", label: "Overall (Tổng)" },
 ] as const;
-
 const REVIEW_FIELDS: { key: string; label: string; full?: boolean }[] = [
   { key: "quickSummary", label: "Tổng kết nhanh", full: true },
   { key: "reading", label: "Reading" },
@@ -24,15 +24,14 @@ const REVIEW_FIELDS: { key: string; label: string; full?: boolean }[] = [
   { key: "speaking", label: "Speaking" },
   { key: "notebook", label: "Vở ghi", full: true },
 ];
-
 const emptyBand = () => ({ band: "", sub: "" });
 
 export default function EditFinalReportPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
-
   const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<"form" | "html">("form");
   const [studentName, setStudentName] = useState("");
   const [studentCode, setStudentCode] = useState("");
   const [course, setCourse] = useState("");
@@ -45,6 +44,8 @@ export default function EditFinalReportPage() {
     listening: emptyBand(), reading: emptyBand(), writing: emptyBand(), speaking: emptyBand(), overall: emptyBand(), note: "",
   });
   const [orientation, setOrientation] = useState({ advice: "", classInfo: "" });
+  const [html, setHtml] = useState("");
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -56,6 +57,9 @@ export default function EditFinalReportPage() {
         setStudentCode(r.student?.studentCode || "");
         setCourse(r.course || "");
         setLearnclickUser(r.learnclickUser || "");
+        setHtml(r.html || "");
+        setShareUrl(r.shareUrl || null);
+        setMode(r.html && r.html.trim() ? "html" : "form");
         if (r.skillGrid && Array.isArray(r.skillGrid.units)) setGrid(r.skillGrid);
         if (r.review) setReview({ quickSummary: "", reading: "", listening: "", writingT1: "", writingT2: "", speaking: "", notebook: "", ...r.review });
         if (r.prediction) setPrediction({
@@ -80,13 +84,25 @@ export default function EditFinalReportPage() {
   }
 
   async function handleSave(status: "DRAFT" | "PUBLISHED") {
+    if (mode === "html" && !html.trim()) return alert("Vui lòng dán mã HTML của report");
     setSaving(true);
-    const data = await api.put(`/final-reports/${id}`, {
-      course, learnclickUser, skillGrid: grid, review, prediction, orientation, status,
-    });
+    const payload: any = { course, learnclickUser, prediction, status };
+    if (mode === "html") {
+      payload.html = html;
+      payload.skillGrid = null;
+    } else {
+      payload.html = "";
+      payload.skillGrid = grid;
+      payload.review = review;
+      payload.orientation = orientation;
+    }
+    const data = await api.put(`/final-reports/${id}`, payload);
     setSaving(false);
-    if (data.success) router.push("/bao-cao/cuoi-khoa");
-    else alert(data.message || "Lỗi cập nhật báo cáo");
+    if (data.success) {
+      // cập nhật lại shareUrl (có thể vừa được sinh token / vừa publish)
+      setShareUrl(data.data?.shareUrl || null);
+      router.push("/bao-cao/cuoi-khoa");
+    } else alert(data.message || "Lỗi cập nhật báo cáo");
   }
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 size={28} className="animate-spin text-gold" /></div>;
@@ -113,27 +129,56 @@ export default function EditFinalReportPage() {
         </div>
       </div>
 
+      {/* Chọn kiểu nhập */}
       <div className="card mb-6">
-        <h3 className="mb-1 font-display text-lg font-bold text-royal">Quá trình tích lũy kĩ năng</h3>
-        <p className="mb-4 text-sm text-muted">Bấm vào ô để nhập điểm. Cột "Đánh giá" tự tính (sửa tay được).</p>
-        <SkillGrid value={grid} onChange={setGrid} />
-      </div>
-
-      <div className="card mb-6">
-        <h3 className="mb-4 font-display text-lg font-bold text-royal">Nhận xét cuối khóa</h3>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {REVIEW_FIELDS.map((f) => (
-            <div key={f.key} className={f.full ? "md:col-span-2" : ""}>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">{f.label}</label>
-              <textarea value={review[f.key]} onChange={(e) => setReview({ ...review, [f.key]: e.target.value })}
-                rows={f.full ? 3 : 2} className="input-field resize-none" />
-            </div>
-          ))}
+        <h3 className="mb-3 font-display text-lg font-bold text-royal">Kiểu nội dung báo cáo</h3>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setMode("form")}
+            className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold ${mode === "form" ? "border-royal bg-royal text-white" : "border-silver/40 bg-white text-muted hover:border-royal/40"}`}>
+            <LayoutGrid size={16} />Biểu mẫu (nhập theo bảng)
+          </button>
+          <button type="button" onClick={() => setMode("html")}
+            className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold ${mode === "html" ? "border-royal bg-royal text-white" : "border-silver/40 bg-white text-muted hover:border-royal/40"}`}>
+            <Code size={16} />Dán HTML/CSS (như Netlify)
+          </button>
         </div>
       </div>
 
+      {mode === "form" ? (
+        <>
+          <div className="card mb-6">
+            <h3 className="mb-1 font-display text-lg font-bold text-royal">Quá trình tích lũy kĩ năng</h3>
+            <p className="mb-4 text-sm text-muted">Bấm vào ô để nhập điểm. Cột "Đánh giá" tự tính (sửa tay được).</p>
+            <SkillGrid value={grid} onChange={setGrid} />
+          </div>
+          <div className="card mb-6">
+            <h3 className="mb-4 font-display text-lg font-bold text-royal">Nhận xét cuối khóa</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {REVIEW_FIELDS.map((f) => (
+                <div key={f.key} className={f.full ? "md:col-span-2" : ""}>
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">{f.label}</label>
+                  <textarea value={review[f.key]} onChange={(e) => setReview({ ...review, [f.key]: e.target.value })}
+                    rows={f.full ? 3 : 2} className="input-field resize-none" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="card mb-6">
+          <h3 className="mb-4 font-display text-lg font-bold text-royal">Nội dung HTML báo cáo</h3>
+          <HtmlReportEditor html={html} onChange={setHtml} shareUrl={shareUrl} />
+        </div>
+      )}
+
+      {/* Điểm dự đoán */}
       <div className="card mb-6">
-        <h3 className="mb-4 font-display text-lg font-bold text-royal">Điểm dự đoán cuối khóa</h3>
+        <h3 className="mb-1 font-display text-lg font-bold text-royal">Điểm dự đoán cuối khóa</h3>
+        <p className="mb-4 text-sm text-muted">
+          {mode === "html"
+            ? "Tuỳ chọn — điền nếu muốn học sinh này xuất hiện trong bảng \"Tổng hợp cả lớp\"."
+            : "Điểm dự đoán từng kỹ năng."}
+        </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {SKILL_BANDS.map((s) => (
             <div key={s.key} className="rounded-lg border border-silver/30 p-3">
@@ -145,28 +190,33 @@ export default function EditFinalReportPage() {
             </div>
           ))}
         </div>
-        <div className="mt-4">
-          <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Ghi chú dự đoán (đoạn dài)</label>
-          <textarea value={prediction.note} onChange={(e) => setPrediction({ ...prediction, note: e.target.value })}
-            rows={3} className="input-field resize-none" />
-        </div>
+        {mode === "form" && (
+          <div className="mt-4">
+            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Ghi chú dự đoán (đoạn dài)</label>
+            <textarea value={prediction.note} onChange={(e) => setPrediction({ ...prediction, note: e.target.value })}
+              rows={3} className="input-field resize-none" />
+          </div>
+        )}
       </div>
 
-      <div className="card mb-6">
-        <h3 className="mb-4 font-display text-lg font-bold text-royal">Định hướng sau khóa học</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Lời khuyên / định hướng</label>
-            <textarea value={orientation.advice} onChange={(e) => setOrientation({ ...orientation, advice: e.target.value })}
-              rows={4} className="input-field resize-none" />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Thông tin lớp luyện đề</label>
-            <textarea value={orientation.classInfo} onChange={(e) => setOrientation({ ...orientation, classInfo: e.target.value })}
-              rows={6} className="input-field resize-none" />
+      {/* Định hướng — chỉ ở chế độ biểu mẫu */}
+      {mode === "form" && (
+        <div className="card mb-6">
+          <h3 className="mb-4 font-display text-lg font-bold text-royal">Định hướng sau khóa học</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Lời khuyên / định hướng</label>
+              <textarea value={orientation.advice} onChange={(e) => setOrientation({ ...orientation, advice: e.target.value })}
+                rows={4} className="input-field resize-none" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Thông tin lớp luyện đề</label>
+              <textarea value={orientation.classInfo} onChange={(e) => setOrientation({ ...orientation, classInfo: e.target.value })}
+                rows={6} className="input-field resize-none" />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="flex items-center justify-end gap-3 border-t border-silver/20 pt-6">
         <Link href="/bao-cao/cuoi-khoa" className="btn-secondary">Huỷ</Link>
