@@ -1,35 +1,46 @@
 // FILE: src/components/report/SkillGrid.tsx
-// Bảng tích lũy kĩ năng cho báo cáo cuối khóa (UNIT × cột kỹ năng IELTS + cột Đánh giá)
+// Bảng tích lũy kĩ năng cuối khóa — CỘT & HÀNG tùy biến; cột "Đánh giá" auto-tính giữ nguyên
 "use client";
 import { useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2, X, Settings2, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 
 export interface SkillItem { title: string; score: number | null; note: string; }
+export interface SkillColumn { key: string; label: string; maroon?: boolean; }
 export interface SkillUnitRow {
   key: string;
   label: string;
   sublabel: string;
   cells: Record<string, SkillItem[]>;
-  rating: number | null;   // cột Đánh giá: tự tính TB nhưng sửa được
+  rating: number | null;
 }
-export interface SkillGridData { units: SkillUnitRow[]; }
+export interface SkillGridData {
+  columns?: SkillColumn[];   // NEW
+  units: SkillUnitRow[];
+}
 
-// 8 cột kỹ năng theo mẫu cuối khóa
-export const SKILL_COLS = [
+export const DEFAULT_SKILL_COLS: SkillColumn[] = [
   { key: "readingA", label: "Reading A" },
   { key: "readingB", label: "Reading B" },
   { key: "listeningA", label: "Listening A / Reading C" },
   { key: "listeningB", label: "Listening B / Transcript" },
-  { key: "writing", label: "Writing", lc: true },
-  { key: "speaking", label: "Speaking", lc: true },
+  { key: "writing", label: "Writing" },
+  { key: "speaking", label: "Speaking" },
   { key: "lectures", label: "Lectures", maroon: true },
   { key: "examPractice", label: "Exam Practice", maroon: true },
 ];
+export const SKILL_COLS = DEFAULT_SKILL_COLS; // giữ export cũ
+
+export function getSkillColumns(grid: SkillGridData | undefined): SkillColumn[] {
+  if (grid?.columns && grid.columns.length > 0) return grid.columns;
+  return DEFAULT_SKILL_COLS;
+}
+function genColKey(): string { return "sk_" + Math.random().toString(36).slice(2, 8); }
 
 export function makeEmptySkillGrid(): SkillGridData {
+  const columns = DEFAULT_SKILL_COLS.map((c) => ({ ...c }));
   const emptyCells = () => {
     const c: Record<string, SkillItem[]> = {};
-    SKILL_COLS.forEach((col) => { c[col.key] = []; });
+    columns.forEach((col) => { c[col.key] = []; });
     return c;
   };
   const units: SkillUnitRow[] = [];
@@ -42,13 +53,13 @@ export function makeEmptySkillGrid(): SkillGridData {
       rating: null,
     });
   }
-  return { units };
+  return { columns, units };
 }
 
-// Tính TB% các ô có điểm trong 1 unit
-export function computeRating(unit: SkillUnitRow): number | null {
+// TB% trên các cột hiện có của unit (dựa vào columns động)
+export function computeRating(unit: SkillUnitRow, columns: SkillColumn[]): number | null {
   const scores: number[] = [];
-  SKILL_COLS.forEach((col) => {
+  columns.forEach((col) => {
     (unit.cells[col.key] || []).forEach((it) => {
       if (it.score !== null && !isNaN(it.score)) scores.push(it.score);
     });
@@ -71,26 +82,96 @@ interface Props {
 
 export default function SkillGrid({ value, onChange }: Props) {
   const [editing, setEditing] = useState<{ u: string; c: string } | null>(null);
+  const [manageCols, setManageCols] = useState(false);
+
+  const columns = getSkillColumns(value);
+  const units = value.units || [];
+  function ensureColumns(): SkillColumn[] {
+    return value.columns && value.columns.length > 0 ? value.columns : DEFAULT_SKILL_COLS.map((c) => ({ ...c }));
+  }
+  function commit(next: SkillGridData) { onChange(next); }
 
   function updateUnit(unitKey: string, updater: (u: SkillUnitRow) => SkillUnitRow) {
-    onChange({ units: value.units.map((u) => (u.key === unitKey ? updater(u) : u)) });
+    commit({ columns: ensureColumns(), units: units.map((u) => (u.key === unitKey ? updater(u) : u)) });
   }
-
   function updateCell(unitKey: string, colKey: string, items: SkillItem[]) {
+    const cols = ensureColumns();
     updateUnit(unitKey, (u) => {
       const next = { ...u, cells: { ...u.cells, [colKey]: items } };
-      next.rating = computeRating(next); // tự tính lại khi đổi điểm
+      next.rating = computeRating(next, cols);
       return next;
     });
   }
-
   function setRating(unitKey: string, val: number | null) {
     updateUnit(unitKey, (u) => ({ ...u, rating: val }));
   }
 
-  const editUnit = editing ? value.units.find((u) => u.key === editing.u) : null;
-  const editItems = editUnit && editing ? (editUnit.cells[editing.c] || []) : [];
+  // ── CỘT ──
+  function addColumn() {
+    const cols = ensureColumns();
+    const newCol: SkillColumn = { key: genColKey(), label: "Cột mới" };
+    const nextUnits = units.map((u) => ({ ...u, cells: { ...u.cells, [newCol.key]: [] } }));
+    commit({ columns: [...cols, newCol], units: nextUnits });
+  }
+  function renameColumn(key: string, label: string) {
+    commit({ columns: ensureColumns().map((c) => (c.key === key ? { ...c, label } : c)), units });
+  }
+  function toggleColumnColor(key: string) {
+    commit({ columns: ensureColumns().map((c) => (c.key === key ? { ...c, maroon: !c.maroon } : c)), units });
+  }
+  function moveColumn(key: string, dir: -1 | 1) {
+    const cols = [...ensureColumns()];
+    const i = cols.findIndex((c) => c.key === key);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= cols.length) return;
+    [cols[i], cols[j]] = [cols[j], cols[i]];
+    commit({ columns: cols, units });
+  }
+  function removeColumn(key: string) {
+    const hasData = units.some((u) => (u.cells[key] || []).length > 0);
+    if (hasData && !confirm("Cột này đang có dữ liệu. Xoá cột sẽ mất dữ liệu trong cột. Tiếp tục?")) return;
+    const cols = ensureColumns().filter((c) => c.key !== key);
+    const nextUnits = units.map((u) => {
+      const { [key]: _drop, ...rest } = u.cells;
+      const nu = { ...u, cells: rest };
+      nu.rating = computeRating(nu, cols); // tính lại vì bớt cột
+      return nu;
+    });
+    commit({ columns: cols, units: nextUnits });
+  }
 
+  // ── HÀNG ──
+  function addRow() {
+    const cols = ensureColumns();
+    const cells: Record<string, SkillItem[]> = {};
+    cols.forEach((c) => { cells[c.key] = []; });
+    const newRow: SkillUnitRow = { key: "row_" + Math.random().toString(36).slice(2, 8), label: "UNIT mới", sublabel: "", cells, rating: null };
+    commit({ columns: cols, units: [...units, newRow] });
+  }
+  function updateRow(key: string, field: "label" | "sublabel", val: string) {
+    updateUnit(key, (u) => ({ ...u, [field]: val }));
+  }
+  function moveRow(key: string, dir: -1 | 1) {
+    const rows = [...units];
+    const i = rows.findIndex((u) => u.key === key);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= rows.length) return;
+    [rows[i], rows[j]] = [rows[j], rows[i]];
+    commit({ columns: ensureColumns(), units: rows });
+  }
+  function removeRow(key: string) {
+    const u = units.find((x) => x.key === key);
+    const hasData = u ? Object.values(u.cells).some((arr) => arr.length > 0) : false;
+    if (hasData && !confirm("Hàng này đang có dữ liệu. Xoá hàng sẽ mất dữ liệu của hàng. Tiếp tục?")) return;
+    commit({ columns: ensureColumns(), units: units.filter((x) => x.key !== key) });
+  }
+  function resetToDefault() {
+    if (!confirm("Khôi phục bộ cột & hàng mẫu chuẩn? Toàn bộ cột/hàng và dữ liệu hiện tại sẽ bị thay thế.")) return;
+    commit(makeEmptySkillGrid());
+  }
+
+  const editUnit = editing ? units.find((u) => u.key === editing.u) : null;
+  const editItems = editUnit && editing ? (editUnit.cells[editing.c] || []) : [];
   function addItem() {
     if (!editing) return;
     updateCell(editing.u, editing.c, [...editItems, { title: "", score: null, note: "" }]);
@@ -106,12 +187,57 @@ export default function SkillGrid({ value, onChange }: Props) {
 
   return (
     <div className="relative">
+      {/* Thanh công cụ */}
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => setManageCols((v) => !v)}
+          className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold ${manageCols ? "border-royal bg-royal text-white" : "border-silver/40 bg-white text-muted hover:border-royal/40"}`}>
+          <Settings2 size={13} />{manageCols ? "Xong tùy chỉnh cột" : "Tùy chỉnh cột"}
+        </button>
+        <button type="button" onClick={addColumn}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-silver/40 bg-white px-3 py-1.5 text-xs font-semibold text-muted hover:border-royal/40">
+          <Plus size={13} />Thêm cột
+        </button>
+        <button type="button" onClick={addRow}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-silver/40 bg-white px-3 py-1.5 text-xs font-semibold text-muted hover:border-royal/40">
+          <Plus size={13} />Thêm hàng
+        </button>
+        <button type="button" onClick={resetToDefault}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-silver/40 bg-white px-3 py-1.5 text-xs font-semibold text-muted hover:border-red-300 hover:text-red-600">
+          <RotateCcw size={13} />Khôi phục mẫu chuẩn
+        </button>
+      </div>
+
+      {manageCols && (
+        <div className="mb-3 rounded-lg border border-royal/20 bg-royal/5 p-3">
+          <p className="mb-2 text-xs font-semibold text-royal">Quản lý cột kỹ năng — đổi tên, đổi màu, sắp xếp, xoá (cột "Đánh giá" luôn ở cuối, không đổi được):</p>
+          <div className="space-y-2">
+            {columns.map((col, i) => (
+              <div key={col.key} className="flex flex-wrap items-center gap-2">
+                <input value={col.label} onChange={(e) => renameColumn(col.key, e.target.value)}
+                  className="min-w-[140px] flex-1 rounded border border-silver/40 bg-white px-2 py-1 text-xs" placeholder="Tên cột" />
+                <button type="button" onClick={() => toggleColumnColor(col.key)}
+                  className="rounded px-2 py-1 text-[0.65rem] font-bold text-white"
+                  style={{ background: col.maroon ? "#7A1020" : "#162A5A" }} title="Bấm để đổi màu tiêu đề cột">
+                  {col.maroon ? "Đỏ đô" : "Navy"}
+                </button>
+                <button type="button" onClick={() => moveColumn(col.key, -1)} disabled={i === 0}
+                  className="rounded border border-silver/40 p-1 text-muted disabled:opacity-30 hover:text-royal"><ChevronLeft size={13} /></button>
+                <button type="button" onClick={() => moveColumn(col.key, 1)} disabled={i === columns.length - 1}
+                  className="rounded border border-silver/40 p-1 text-muted disabled:opacity-30 hover:text-royal"><ChevronRight size={13} /></button>
+                <button type="button" onClick={() => removeColumn(col.key)}
+                  className="rounded border border-silver/40 p-1 text-red-500 hover:bg-red-50"><Trash2 size={13} /></button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="overflow-x-auto rounded-lg border border-silver/30">
         <table className="w-full border-collapse text-xs" style={{ minWidth: 1000 }}>
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 bg-[#162A5A] px-2 py-2 text-gold-light" style={{ width: 80 }}>Unit</th>
-              {SKILL_COLS.map((col) => (
+              <th className="sticky left-0 z-10 bg-[#162A5A] px-2 py-2 text-gold-light" style={{ width: 110 }}>Unit</th>
+              {columns.map((col) => (
                 <th key={col.key}
                   className={`px-2 py-2 text-center text-[0.65rem] font-bold uppercase text-white ${col.maroon ? "bg-[#7A1020]" : "bg-[#162A5A]"}`}>
                   {col.label}
@@ -121,13 +247,32 @@ export default function SkillGrid({ value, onChange }: Props) {
             </tr>
           </thead>
           <tbody>
-            {value.units.map((unit) => (
+            {units.map((unit, ri) => (
               <tr key={unit.key}>
                 <td className="sticky left-0 z-10 bg-[#162A5A] px-2 py-2 text-center align-middle font-bold text-gold-light">
-                  {unit.label}
-                  <div className="text-[0.55rem] font-normal text-white/70">{unit.sublabel}</div>
+                  {manageCols ? (
+                    <div className="space-y-1">
+                      <input value={unit.label} onChange={(e) => updateRow(unit.key, "label", e.target.value)}
+                        className="w-full rounded bg-white/90 px-1 py-0.5 text-center text-[0.6rem] font-bold text-[#162A5A]" placeholder="Tên hàng" />
+                      <input value={unit.sublabel} onChange={(e) => updateRow(unit.key, "sublabel", e.target.value)}
+                        className="w-full rounded bg-white/70 px-1 py-0.5 text-center text-[0.52rem] text-[#162A5A]" placeholder="Ghi chú nhỏ" />
+                      <div className="flex justify-center gap-1 pt-0.5">
+                        <button type="button" onClick={() => moveRow(unit.key, -1)} disabled={ri === 0}
+                          className="rounded bg-white/80 p-0.5 text-[#162A5A] disabled:opacity-30" title="Lên">↑</button>
+                        <button type="button" onClick={() => moveRow(unit.key, 1)} disabled={ri === units.length - 1}
+                          className="rounded bg-white/80 p-0.5 text-[#162A5A] disabled:opacity-30" title="Xuống">↓</button>
+                        <button type="button" onClick={() => removeRow(unit.key)}
+                          className="rounded bg-white/80 p-0.5 text-red-600" title="Xoá hàng"><Trash2 size={11} /></button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {unit.label}
+                      <div className="text-[0.55rem] font-normal text-white/70">{unit.sublabel}</div>
+                    </>
+                  )}
                 </td>
-                {SKILL_COLS.map((col) => {
+                {columns.map((col) => {
                   const items = unit.cells[col.key] || [];
                   return (
                     <td key={col.key}
@@ -150,7 +295,6 @@ export default function SkillGrid({ value, onChange }: Props) {
                     </td>
                   );
                 })}
-                {/* Cột Đánh giá: tự tính nhưng sửa được */}
                 <td className="border border-silver/20 bg-[#F8F8F6] px-1 py-1 text-center align-middle">
                   <input type="number" value={unit.rating ?? ""} onClick={(e) => e.stopPropagation()}
                     onChange={(e) => setRating(unit.key, e.target.value === "" ? null : parseInt(e.target.value))}
@@ -164,19 +308,17 @@ export default function SkillGrid({ value, onChange }: Props) {
         </table>
       </div>
 
-      {/* Popup chỉnh ô kỹ năng */}
+      {/* Popup chỉnh ô (giữ nguyên) */}
       {editing && editUnit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditing(null)}>
           <div className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
               <h3 className="font-bold text-royal">
-                {editUnit.label} — {SKILL_COLS.find((c) => c.key === editing.c)?.label}
+                {editUnit.label} — {columns.find((c) => c.key === editing.c)?.label}
               </h3>
               <button onClick={() => setEditing(null)} className="text-muted hover:text-royal"><X size={18} /></button>
             </div>
-
             {editItems.length === 0 && <p className="mb-3 text-sm text-muted">Chưa có mục nào. Bấm "Thêm mục" để nhập.</p>}
-
             <div className="space-y-3">
               {editItems.map((it, idx) => (
                 <div key={idx} className="rounded-lg border border-silver/30 p-3">
@@ -201,12 +343,10 @@ export default function SkillGrid({ value, onChange }: Props) {
                 </div>
               ))}
             </div>
-
             <button onClick={addItem} className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gold/40 py-2 text-sm font-medium text-gold-dim hover:bg-gold/5">
               <Plus size={15} />Thêm mục
             </button>
             <div className="mt-2 text-center text-[0.7rem] text-muted">Đánh giá unit này tự tính lại khi bạn đổi điểm (vẫn sửa tay được ở cột Đánh giá).</div>
-
             <div className="mt-4 flex justify-end">
               <button onClick={() => setEditing(null)} className="btn-primary">Xong</button>
             </div>
