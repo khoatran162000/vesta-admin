@@ -8,7 +8,6 @@ import { api } from "@/lib/api";
 import SkillGrid, { SkillGridData, makeEmptySkillGrid } from "@/components/report/SkillGrid";
 import HtmlReportEditor from "@/components/report/HtmlReportEditor";
 import { DEFAULT_ADVICE, DEFAULT_CLASS_INFO } from "@/components/report/finalReportDefaults";
-
 interface Student { id: string; fullName: string; studentCode: string | null; course: string | null; }
 const SKILL_BANDS = [
   { key: "listening", label: "Nghe (Listening)" },
@@ -26,11 +25,13 @@ const REVIEW_FIELDS: { key: string; label: string; full?: boolean }[] = [
   { key: "speaking", label: "Speaking" },
   { key: "notebook", label: "Vở ghi", full: true },
 ];
-
 export default function CreateFinalReportPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"form" | "html">("form");
   const [students, setStudents] = useState<Student[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [classId, setClassId] = useState("");
+  const [classStudents, setClassStudents] = useState<Student[] | null>(null);
   const [studentId, setStudentId] = useState("");
   const [course, setCourse] = useState("");
   const [learnclickUser, setLearnclickUser] = useState("");
@@ -46,7 +47,6 @@ export default function CreateFinalReportPage() {
   const [orientation, setOrientation] = useState({ advice: DEFAULT_ADVICE, classInfo: DEFAULT_CLASS_INFO });
   const [html, setHtml] = useState("");
   const [saving, setSaving] = useState(false);
-
   useEffect(() => {
     (async () => {
       const data = await api.get("/users?role=STUDENT&limit=1000");
@@ -54,32 +54,44 @@ export default function CreateFinalReportPage() {
         const list = Array.isArray(data.data) ? data.data : (data.data?.users || []);
         setStudents(list);
       }
+      const cl = await api.get("/classes");
+      if (cl.success) setClasses(cl.data || []);
     })();
   }, []);
-
+  async function onSelectClass(cid: string) {
+    setClassId(cid);
+    setStudentId("");
+    setLearnclickUser("");
+    if (!cid) { setClassStudents(null); return; }
+    const res = await api.get(`/classes/${cid}`);
+    if (res.success) {
+      setClassStudents((res.data.enrollments || []).map((e: any) => e.student));
+      if (res.data.course) setCourse(res.data.course);
+    }
+  }
+  const studentOptions = classStudents ?? students;
   function onSelectStudent(id: string) {
     setStudentId(id);
-    const s = students.find((x) => x.id === id);
+    const s = studentOptions.find((x) => x.id === id);
     if (s?.course) setCourse(s.course);
   }
   function setBand(skill: string, field: "band" | "sub", val: string) {
     setPrediction((p: any) => ({ ...p, [skill]: { ...p[skill], [field]: val } }));
   }
-
   async function handleSave(status: "DRAFT" | "PUBLISHED") {
     if (!studentId) return alert("Vui lòng chọn học sinh");
     if (mode === "html" && !html.trim()) return alert("Vui lòng dán mã HTML của report");
     setSaving(true);
     const payload: any = {
-      studentId, course, learnclickUser, prediction, status,
+      studentId, course, learnclickUser, prediction, classId: classId || null, status,
     };
     if (mode === "html") {
       payload.html = html;
-      payload.skillGrid = null;      // báo backend: đây là report HTML
+      payload.skillGrid = null;
       payload.review = null;
       payload.orientation = null;
     } else {
-      payload.html = "";             // đảm bảo không dính HTML thừa
+      payload.html = "";
       payload.skillGrid = grid;
       payload.review = review;
       payload.orientation = orientation;
@@ -89,26 +101,32 @@ export default function CreateFinalReportPage() {
     if (data.success) router.push("/bao-cao/cuoi-khoa");
     else alert(data.message || "Lỗi tạo báo cáo");
   }
-
   return (
     <div className="mx-auto max-w-[1300px]">
       <Link href="/bao-cao/cuoi-khoa" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-royal">
         <ArrowLeft size={15} />Quay lại
       </Link>
       <h2 className="mb-6 font-display text-2xl font-bold text-royal">🎓 Tạo Báo Cáo Cuối Khóa</h2>
-
       {/* Thông tin chung */}
       <div className="card mb-6">
         <h3 className="mb-4 font-display text-lg font-bold text-royal">Thông tin chung</h3>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Lớp (tuỳ chọn)</label>
+            <select value={classId} onChange={(e) => onSelectClass(e.target.value)} className="input-field">
+              <option value="">— Không gắn lớp —</option>
+              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
           <div>
             <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Học sinh</label>
             <select value={studentId} onChange={(e) => onSelectStudent(e.target.value)} className="input-field">
               <option value="">— Chọn học sinh —</option>
-              {students.map((s) => (
+              {studentOptions.map((s) => (
                 <option key={s.id} value={s.id}>{s.fullName} {s.studentCode ? `(${s.studentCode})` : ""}</option>
               ))}
             </select>
+            {classStudents && <p className="mt-1 text-[0.7rem] text-muted">Đang lọc theo lớp — {classStudents.length} học viên</p>}
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Lớp / Khoá</label>
@@ -120,7 +138,6 @@ export default function CreateFinalReportPage() {
           </div>
         </div>
       </div>
-
       {/* Chọn kiểu nhập */}
       <div className="card mb-6">
         <h3 className="mb-3 font-display text-lg font-bold text-royal">Kiểu nội dung báo cáo</h3>
@@ -140,7 +157,6 @@ export default function CreateFinalReportPage() {
             : "Dán nguyên mã HTML report của chị. Học sinh & phụ huynh sẽ thấy đúng giao diện đó."}
         </p>
       </div>
-
       {mode === "form" ? (
         <>
           {/* Bảng kỹ năng */}
@@ -169,8 +185,7 @@ export default function CreateFinalReportPage() {
           <HtmlReportEditor html={html} onChange={setHtml} />
         </div>
       )}
-
-      {/* Điểm dự đoán — luôn hiện (để lên bảng tổng hợp lớp); ở chế độ HTML là tuỳ chọn */}
+      {/* Điểm dự đoán */}
       <div className="card mb-6">
         <h3 className="mb-1 font-display text-lg font-bold text-royal">Điểm dự đoán cuối khóa</h3>
         <p className="mb-4 text-sm text-muted">
@@ -197,7 +212,6 @@ export default function CreateFinalReportPage() {
           </div>
         )}
       </div>
-
       {/* Định hướng — chỉ ở chế độ biểu mẫu */}
       {mode === "form" && (
         <div className="card mb-6">
@@ -217,7 +231,6 @@ export default function CreateFinalReportPage() {
           </div>
         </div>
       )}
-
       <div className="flex items-center justify-end gap-3 border-t border-silver/20 pt-6">
         <Link href="/bao-cao/cuoi-khoa" className="btn-secondary">Huỷ</Link>
         <button onClick={() => handleSave("DRAFT")} disabled={saving} className="btn-secondary">

@@ -1,11 +1,10 @@
-// FILE: src/app/(protected)/bao-cao/cuoi-khoa/tong-hop/page.tsx — Tổng hợp cả lớp
+// FILE: src/app/(protected)/bao-cao/cuoi-khoa/tong-hop/page.tsx — Tổng hợp cả lớp (theo lớp hoặc trình độ)
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Printer, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
-
 const SKILLS = [
   { key: "listening", label: "Nghe" },
   { key: "reading", label: "Đọc" },
@@ -13,27 +12,37 @@ const SKILLS = [
   { key: "speaking", label: "Nói" },
   { key: "overall", label: "Overall" },
 ];
-
+const LEVELS = ["5+", "6+", "7+", "1-1", "Intensive", "Writing", "Chuyên Cấp 3"];
 export default function FinalReportSummaryPage() {
   const sp = useSearchParams();
-  const course = sp.get("course") || "";
+  const [classes, setClasses] = useState<any[]>([]);
+  const [classId, setClassId] = useState(sp.get("classId") || "");
+  const [course, setCourse] = useState(sp.get("course") || "");
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const cl = await api.get("/classes");
+      if (cl.success) setClasses(cl.data || []);
+    })();
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (course) params.set("course", course);
+    if (classId) params.set("classId", classId);
+    else if (course) params.set("course", course);
     const data = await api.get(`/final-reports?${params}`);
     if (data.success) {
-      // chỉ lấy bản đã xuất bản cho bảng tổng hợp gửi lớp
       setReports((data.data || []).filter((r: any) => r.status === "PUBLISHED"));
     }
     setLoading(false);
-  }, [course]);
+  }, [classId, course]);
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 size={28} className="animate-spin text-gold" /></div>;
+  const className = classId ? (classes.find((c) => c.id === classId)?.name || "") : "";
+  const scopeLabel = classId ? `Lớp ${className}` : (course ? `Trình độ ${course}` : "(tất cả)");
 
   return (
     <div className="mx-auto max-w-[1100px]">
@@ -44,14 +53,37 @@ export default function FinalReportSummaryPage() {
         <button onClick={() => window.print()} className="btn-primary"><Printer size={15} />In bảng tổng hợp</button>
       </div>
 
-      <h2 className="mb-1 font-display text-2xl font-bold text-royal">
-        Tổng hợp điểm dự đoán cuối khóa {course ? `— Lớp ${course}` : "(tất cả lớp)"}
-      </h2>
-      <p className="mb-6 text-sm text-muted">{reports.length} học viên đã có báo cáo xuất bản</p>
+      <h2 className="mb-1 font-display text-2xl font-bold text-royal">Tổng hợp điểm dự đoán cuối khóa</h2>
+      <p className="mb-4 text-sm text-muted">Lọc theo lớp cụ thể, hoặc theo trình độ (cho báo cáo chưa gắn lớp).</p>
 
-      {reports.length === 0 ? (
+      {/* Bộ lọc: chọn Lớp (ưu tiên) hoặc Trình độ */}
+      <div className="mb-6 flex flex-wrap gap-3 print:hidden">
+        <div>
+          <label className="mb-1 block text-[0.7rem] font-bold uppercase tracking-wider text-muted">Lớp</label>
+          <select value={classId} onChange={(e) => { setClassId(e.target.value); if (e.target.value) setCourse(""); }}
+            className="rounded-lg border border-silver/40 bg-white px-4 py-2 text-sm outline-none focus:border-gold">
+            <option value="">— Chọn lớp —</option>
+            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-[0.7rem] font-bold uppercase tracking-wider text-muted">Hoặc theo trình độ</label>
+          <select value={course} onChange={(e) => { setCourse(e.target.value); if (e.target.value) setClassId(""); }}
+            className="rounded-lg border border-silver/40 bg-white px-4 py-2 text-sm outline-none focus:border-gold">
+            <option value="">— Tất cả trình độ —</option>
+            {LEVELS.map((c) => <option key={c} value={c}>Trình độ {c}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <h3 className="mb-1 font-display text-lg font-bold text-royal">Phạm vi: {scopeLabel}</h3>
+      <p className="mb-4 text-sm text-muted">{reports.length} học viên đã có báo cáo xuất bản</p>
+
+      {loading ? (
+        <div className="flex justify-center py-20"><Loader2 size={28} className="animate-spin text-gold" /></div>
+      ) : reports.length === 0 ? (
         <div className="rounded-xl border border-silver/30 bg-white py-16 text-center text-sm text-muted">
-          Chưa có báo cáo cuối khóa nào được xuất bản{course ? ` cho lớp ${course}` : ""}.
+          Chưa có báo cáo cuối khóa nào được xuất bản trong phạm vi này.
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-silver/30 bg-white">
@@ -59,7 +91,7 @@ export default function FinalReportSummaryPage() {
             <thead><tr className="border-b bg-cream">
               <th className="px-4 py-3 font-semibold text-royal">#</th>
               <th className="px-4 py-3 font-semibold text-royal">Học sinh</th>
-              <th className="px-4 py-3 font-semibold text-royal">Lớp</th>
+              <th className="px-4 py-3 font-semibold text-royal">Lớp / Trình độ</th>
               {SKILLS.map((s) => <th key={s.key} className="px-3 py-3 text-center font-semibold text-royal">{s.label}</th>)}
               <th className="px-4 py-3 text-center font-semibold text-royal print:hidden">Chi tiết</th>
             </tr></thead>
@@ -74,7 +106,9 @@ export default function FinalReportSummaryPage() {
                       <div className="text-xs font-mono text-muted">{r.student?.studentCode}</div>
                     </td>
                     <td className="px-4 py-3">
-                      {r.course && <span className="rounded-full bg-royal/8 px-2 py-0.5 text-[0.65rem] font-semibold text-royal">{r.course}</span>}
+                      {r.class?.name
+                        ? <span className="rounded-full bg-royal/8 px-2 py-0.5 text-[0.65rem] font-semibold text-royal">{r.class.name}</span>
+                        : (r.course && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[0.65rem] font-semibold text-gray-600">{r.course}</span>)}
                     </td>
                     {SKILLS.map((s) => (
                       <td key={s.key} className="px-3 py-3 text-center font-bold text-[#162A5A]">

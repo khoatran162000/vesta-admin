@@ -12,6 +12,9 @@ export default function CreateReportPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"form" | "html">("form");
   const [students, setStudents] = useState<Student[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [classId, setClassId] = useState("");
+  const [classStudents, setClassStudents] = useState<Student[] | null>(null);
   const [studentId, setStudentId] = useState("");
   const [course, setCourse] = useState("");
   const [learnclickUser, setLearnclickUser] = useState("");
@@ -30,11 +33,26 @@ export default function CreateReportPage() {
         const list = Array.isArray(data.data) ? data.data : (data.data?.users || data.data?.items || []);
         setStudents(list);
       }
+      const cl = await api.get("/classes");
+      if (cl.success) setClasses(cl.data || []);
     })();
   }, []);
+  async function onSelectClass(cid: string) {
+    setClassId(cid);
+    setStudentId("");
+    setLearnclickUser("");
+    setPadletAccount("");
+    if (!cid) { setClassStudents(null); return; }
+    const res = await api.get(`/classes/${cid}`);
+    if (res.success) {
+      setClassStudents((res.data.enrollments || []).map((e: any) => e.student));
+      if (res.data.course) setCourse(res.data.course);
+    }
+  }
+  const studentOptions = classStudents ?? students;
   function onSelectStudent(id: string) {
     setStudentId(id);
-    const s = students.find((x) => x.id === id);
+    const s = studentOptions.find((x) => x.id === id);
     if (s?.course) setCourse(s.course);
   }
   async function handleSave(status: "DRAFT" | "PUBLISHED") {
@@ -43,6 +61,7 @@ export default function CreateReportPage() {
     setSaving(true);
     const payload: any = {
       studentId, course, learnclickUser, padletAccount,
+      classId: classId || null,
       periodTo: periodTo || null, dataFrom: dataFrom || null, dataTo: dataTo || null,
       status,
     };
@@ -77,13 +96,21 @@ export default function CreateReportPage() {
         <h3 className="mb-4 font-display text-lg font-bold text-royal">Thông tin chung</h3>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
+            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Lớp (tuỳ chọn)</label>
+            <select value={classId} onChange={(e) => onSelectClass(e.target.value)} className="input-field">
+              <option value="">— Không gắn lớp —</option>
+              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
             <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Học sinh</label>
             <select value={studentId} onChange={(e) => onSelectStudent(e.target.value)} className="input-field">
               <option value="">— Chọn học sinh —</option>
-              {students.map((s) => (
+              {studentOptions.map((s) => (
                 <option key={s.id} value={s.id}>{s.fullName} {s.studentCode ? `(${s.studentCode})` : ""}</option>
               ))}
             </select>
+            {classStudents && <p className="mt-1 text-[0.7rem] text-muted">Đang lọc theo lớp — {classStudents.length} học viên</p>}
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Lớp / Khoá</label>
@@ -101,7 +128,7 @@ export default function CreateReportPage() {
             <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Kỳ báo cáo (đến ngày)</label>
             <input type="date" value={periodTo} onChange={(e) => setPeriodTo(e.target.value)} className="input-field" />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 md:col-span-2">
             <div>
               <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Dữ liệu từ</label>
               <input type="date" value={dataFrom} onChange={(e) => setDataFrom(e.target.value)} className="input-field" />
