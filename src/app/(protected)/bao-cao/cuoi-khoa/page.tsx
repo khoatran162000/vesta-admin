@@ -4,24 +4,29 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Plus, Loader2, Pencil, Trash2, Layers } from "lucide-react";
 import { api } from "@/lib/api";
-
-const COURSES = ["5+", "6+", "7+", "1-1", "Intensive", "Writing", "Chuyên Cấp 3"];
-
+import { COURSES } from "@/lib/courses";
 export default function FinalReportListPage() {
   const [reports, setReports] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterCourse, setFilterCourse] = useState("");
-
+  const [filterClassId, setFilterClassId] = useState("");
+  useEffect(() => {
+    (async () => {
+      const cl = await api.get("/classes");
+      if (cl.success) setClasses(cl.data || []);
+    })();
+  }, []);
   const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (filterCourse) params.set("course", filterCourse);
+    if (filterClassId) params.set("classId", filterClassId);
+    else if (filterCourse) params.set("course", filterCourse);
     const data = await api.get(`/final-reports?${params}`);
     if (data.success) setReports(data.data || []);
     setLoading(false);
-  }, [filterCourse]);
+  }, [filterClassId, filterCourse]);
   useEffect(() => { load(); }, [load]);
-
   async function handleDelete(id: string) {
     if (!confirm("Xoá báo cáo cuối khóa này?")) return;
     const data = await api.delete(`/final-reports/${id}`);
@@ -32,7 +37,11 @@ export default function FinalReportListPage() {
     if (!d) return "—";
     return new Date(d).toLocaleDateString("vi-VN");
   }
-
+  const summaryHref = filterClassId
+    ? `/bao-cao/cuoi-khoa/tong-hop?classId=${encodeURIComponent(filterClassId)}`
+    : filterCourse
+    ? `/bao-cao/cuoi-khoa/tong-hop?course=${encodeURIComponent(filterCourse)}`
+    : "/bao-cao/cuoi-khoa/tong-hop";
   return (
     <div className="mx-auto max-w-[1100px]">
       <div className="mb-6 flex items-center justify-between">
@@ -41,8 +50,7 @@ export default function FinalReportListPage() {
           <p className="mt-1 text-sm text-muted">{reports.length} báo cáo</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href={`/bao-cao/cuoi-khoa/tong-hop${filterCourse ? `?course=${encodeURIComponent(filterCourse)}` : ""}`}
-            className="btn-secondary">
+          <Link href={summaryHref} className="btn-secondary">
             <Layers size={16} />Tổng hợp cả lớp
           </Link>
           <Link href="/bao-cao/cuoi-khoa/tao-moi" className="btn-primary">
@@ -50,15 +58,24 @@ export default function FinalReportListPage() {
           </Link>
         </div>
       </div>
-
-      <div className="mb-4">
-        <select value={filterCourse} onChange={(e) => setFilterCourse(e.target.value)}
-          className="rounded-lg border border-silver/40 bg-white px-4 py-2 text-sm outline-none focus:border-gold">
-          <option value="">Tất cả lớp</option>
-          {COURSES.map((c) => <option key={c} value={c}>Lớp {c}</option>)}
-        </select>
+      <div className="mb-4 flex flex-wrap gap-3">
+        <div>
+          <label className="mb-1 block text-[0.7rem] font-bold uppercase tracking-wider text-muted">Lớp</label>
+          <select value={filterClassId} onChange={(e) => { setFilterClassId(e.target.value); if (e.target.value) setFilterCourse(""); }}
+            className="rounded-lg border border-silver/40 bg-white px-4 py-2 text-sm outline-none focus:border-gold">
+            <option value="">— Tất cả lớp —</option>
+            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-[0.7rem] font-bold uppercase tracking-wider text-muted">Hoặc theo trình độ</label>
+          <select value={filterCourse} onChange={(e) => { setFilterCourse(e.target.value); if (e.target.value) setFilterClassId(""); }}
+            className="rounded-lg border border-silver/40 bg-white px-4 py-2 text-sm outline-none focus:border-gold">
+            <option value="">— Tất cả trình độ —</option>
+            {COURSES.map((c) => <option key={c} value={c}>Trình độ {c}</option>)}
+          </select>
+        </div>
       </div>
-
       <div className="overflow-x-auto rounded-xl border border-silver/30 bg-white">
         {loading ? (
           <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-gold" /></div>
@@ -82,7 +99,9 @@ export default function FinalReportListPage() {
                     <div className="text-xs font-mono text-muted">{r.student?.studentCode}</div>
                   </td>
                   <td className="px-4 py-3">
-                    {r.course && <span className="rounded-full bg-royal/8 px-2 py-0.5 text-[0.65rem] font-semibold text-royal">{r.course}</span>}
+                    {r.class?.name
+                      ? <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[0.65rem] font-semibold text-royal">{r.class.name}</span>
+                      : r.course && <span className="rounded-full bg-royal/8 px-2 py-0.5 text-[0.65rem] font-semibold text-royal">{r.course}</span>}
                   </td>
                   <td className="px-4 py-3 text-muted">{fmtDate(r.createdAt)}</td>
                   <td className="px-4 py-3">

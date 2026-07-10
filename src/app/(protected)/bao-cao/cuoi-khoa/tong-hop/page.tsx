@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Printer, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { COURSES as LEVELS } from "@/lib/courses";
+
 const SKILLS = [
   { key: "listening", label: "Nghe" },
   { key: "reading", label: "Đọc" },
@@ -12,7 +14,7 @@ const SKILLS = [
   { key: "speaking", label: "Nói" },
   { key: "overall", label: "Overall" },
 ];
-const LEVELS = ["5+", "6+", "7+", "1-1", "Intensive", "Writing", "Chuyên Cấp 3"];
+
 export default function FinalReportSummaryPage() {
   const sp = useSearchParams();
   const [classes, setClasses] = useState<any[]>([]);

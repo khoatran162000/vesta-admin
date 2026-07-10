@@ -3,15 +3,21 @@
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Download, TrendingUp, Award, FileText, BookOpen } from "lucide-react";
 import { api } from "@/lib/api";
-
-const COURSES = ["5+", "6+", "7+", "1-1", "Intensive", "Writing", "Chuyên Cấp 3"];
-
+import { COURSES } from "@/lib/courses";
 export default function ReportPage() {
   const [report, setReport] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [classStudentIds, setClassStudentIds] = useState<Set<string> | null>(null);
   const [loading, setLoading] = useState(true);
   const [filterCourse, setFilterCourse] = useState("");
+  const [filterClassId, setFilterClassId] = useState("");
   const [sortBy, setSortBy] = useState<"name" | "exam" | "feedback">("exam");
-
+  useEffect(() => {
+    (async () => {
+      const cl = await api.get("/classes");
+      if (cl.success) setClasses(cl.data || []);
+    })();
+  }, []);
   const loadReport = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -20,26 +26,34 @@ export default function ReportPage() {
     if (data.success) setReport(data.data || []);
     setLoading(false);
   }, [filterCourse]);
-
   useEffect(() => { loadReport(); }, [loadReport]);
-
-  const sorted = [...report].sort((a, b) => {
+  async function onSelectClass(cid: string) {
+    setFilterClassId(cid);
+    if (cid) setFilterCourse("");
+    if (!cid) { setClassStudentIds(null); return; }
+    const res = await api.get(`/classes/${cid}`);
+    if (res.success) {
+      const ids = (res.data.enrollments || []).map((e: any) => e.student?.id).filter(Boolean);
+      setClassStudentIds(new Set(ids));
+    }
+  }
+  // Lọc theo lớp ở client (nếu đã chọn lớp); ngược lại giữ nguyên danh sách từ API
+  const filtered = classStudentIds ? report.filter((s) => classStudentIds.has(s.id)) : report;
+  const sorted = [...filtered].sort((a, b) => {
     if (sortBy === "name") return (a.fullName || "").localeCompare(b.fullName || "");
     if (sortBy === "exam") return (b.avgExamScore || 0) - (a.avgExamScore || 0);
     if (sortBy === "feedback") return (b.avgFeedbackScore || 0) - (a.avgFeedbackScore || 0);
     return 0;
   });
-
-  const validExam = report.filter((s) => s.avgExamScore !== null);
+  const validExam = filtered.filter((s) => s.avgExamScore !== null);
   const overview = {
-    totalStudents: report.length,
-    activeStudents: report.filter((s) => s.totalExams > 0 || s.totalInteractive > 0).length,
+    totalStudents: filtered.length,
+    activeStudents: filtered.filter((s) => s.totalExams > 0 || s.totalInteractive > 0).length,
     avgExam: validExam.length > 0
       ? Math.round(validExam.reduce((sum, s) => sum + (s.avgExamScore || 0), 0) / validExam.length)
       : 0,
-    topStudents: report.filter((s) => (s.avgExamScore || 0) >= 70).length,
+    topStudents: filtered.filter((s) => (s.avgExamScore || 0) >= 70).length,
   };
-
   function downloadCSV() {
     const csv = "Họ tên,Mã HV,Khoá,Bài thi đã làm,Điểm TB,Điểm cao nhất,Bài viết được chấm,Điểm TB viết,Bài tập tương tác,Điểm TB tương tác\n" +
       sorted.map((s) => [
@@ -54,7 +68,6 @@ export default function ReportPage() {
     link.download = `bao-cao-hoc-vien-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
   }
-
   return (
     <div className="mx-auto max-w-[1200px]">
       <div className="mb-6 flex items-center justify-between">
@@ -66,7 +79,6 @@ export default function ReportPage() {
           <Download size={14} />Tải Excel
         </button>
       </div>
-
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
           { icon: BookOpen, label: "Tổng HV", value: overview.totalStudents, color: "#0F1B3D" },
@@ -83,21 +95,33 @@ export default function ReportPage() {
           </div>
         ))}
       </div>
-
       <div className="mb-4 flex flex-wrap gap-3">
-        <select value={filterCourse} onChange={(e) => setFilterCourse(e.target.value)}
-          className="rounded-lg border border-silver/40 bg-white px-4 py-2 text-sm outline-none focus:border-gold">
-          <option value="">Tất cả khoá</option>
-          {COURSES.map((c) => <option key={c} value={c}>Khoá {c}</option>)}
-        </select>
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}
-          className="rounded-lg border border-silver/40 bg-white px-4 py-2 text-sm outline-none focus:border-gold">
-          <option value="exam">Sắp theo điểm thi</option>
-          <option value="feedback">Sắp theo điểm chấm</option>
-          <option value="name">Sắp theo tên</option>
-        </select>
+        <div>
+          <label className="mb-1 block text-[0.7rem] font-bold uppercase tracking-wider text-muted">Lớp</label>
+          <select value={filterClassId} onChange={(e) => onSelectClass(e.target.value)}
+            className="rounded-lg border border-silver/40 bg-white px-4 py-2 text-sm outline-none focus:border-gold">
+            <option value="">— Tất cả lớp —</option>
+            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-[0.7rem] font-bold uppercase tracking-wider text-muted">Hoặc theo khoá</label>
+          <select value={filterCourse} onChange={(e) => { setFilterCourse(e.target.value); if (e.target.value) { setFilterClassId(""); setClassStudentIds(null); } }}
+            className="rounded-lg border border-silver/40 bg-white px-4 py-2 text-sm outline-none focus:border-gold">
+            <option value="">— Tất cả khoá —</option>
+            {COURSES.map((c) => <option key={c} value={c}>Khoá {c}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-[0.7rem] font-bold uppercase tracking-wider text-muted">Sắp xếp</label>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}
+            className="rounded-lg border border-silver/40 bg-white px-4 py-2 text-sm outline-none focus:border-gold">
+            <option value="exam">Sắp theo điểm thi</option>
+            <option value="feedback">Sắp theo điểm chấm</option>
+            <option value="name">Sắp theo tên</option>
+          </select>
+        </div>
       </div>
-
       <div className="overflow-x-auto rounded-xl border border-silver/30 bg-white">
         {loading ? (
           <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-gold" /></div>

@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Save, Loader2, X, PenTool } from "lucide-react";
 import { api } from "@/lib/api";
+import { COURSES } from "@/lib/courses";
 
-const COURSES = ["5+", "6+", "7+", "1-1", "Intensive", "Writing", "Phát Âm", "Chuyên Cấp 3"];
 const STATUS_OPTIONS = [
   { value: "UPCOMING", label: "Sắp khai giảng", color: "bg-blue-50 text-blue-700" },
   { value: "ONGOING", label: "Đang học", color: "bg-green-50 text-green-700" },

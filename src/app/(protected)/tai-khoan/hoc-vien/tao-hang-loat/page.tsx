@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Users, Loader2, CheckCircle, Copy, Download } from "lucide-react";
 import { api } from "@/lib/api";
+import { COURSES } from "@/lib/courses";
 
 interface Account {
   fullName: string;
@@ -11,8 +12,6 @@ interface Account {
   password: string;
   phone: string;
 }
-
-const COURSES = ["5+", "6+", "7+", "1-1", "Intensive", "Writing", "Chuyên Cấp 3"];
 
 export default function BatchCreatePage() {
   const [input, setInput] = useState("");

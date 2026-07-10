@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Save, Loader2, X, BookOpen, FileText, PenTool } from "lucide-react";
 import { api } from "@/lib/api";
+import { COURSES } from "@/lib/courses";
 
-const COURSES = ["5+", "6+", "7+", "1-1", "Intensive", "Writing", "Chuyên Cấp 3"];
 type Section = "diary" | "materials" | "feedback";
 
 export default function ClassContentPage() {

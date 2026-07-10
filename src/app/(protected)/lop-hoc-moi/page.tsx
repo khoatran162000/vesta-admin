@@ -4,8 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Plus, Loader2, Pencil, Trash2, Users, X, Save } from "lucide-react";
 import { api } from "@/lib/api";
-
-const LEVELS = ["5+", "6+", "7+", "1-1", "Intensive", "Writing", "Chuyên Cấp 3"];
+import { COURSES as LEVELS } from "@/lib/courses";
 
 interface ClassRow {
   id: string; name: string; classCode: string | null; course: string | null;

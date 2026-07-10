@@ -1,7 +1,8 @@
 // FILE: src/components/exercise/ExerciseMeta.tsx — Phần thông tin chung dùng cho mọi editor bài tập
 "use client";
 
-export const COURSES = ["5+", "6+", "7+", "1-1", "Intensive", "Writing", "Chuyên Cấp 3"];
+import { COURSES } from "@/lib/courses";
+export { COURSES };
 
 export interface MetaState {
   title: string;
