@@ -14,7 +14,7 @@ export interface CourseData {
   isSpecial: boolean; badgeOutline: boolean;
   features: Feature[];
   commitment: string; scheduleLabel: string; schedule: string;
-  price: string; onlinePrice: string; cta: string;
+  price: string; onlinePrice: string; cta: string; ctaLink: string;
   specialPrice: string; originalPrice: string;
   orderIndex: number; isPublished: boolean;
 }
@@ -25,7 +25,7 @@ export function emptyCourse(): CourseData {
     isSpecial: false, badgeOutline: false,
     features: [{ icon: "🎯", text: "" }],
     commitment: "", scheduleLabel: "THỜI LƯỢNG", schedule: "",
-    price: "", onlinePrice: "", cta: "",
+    price: "", onlinePrice: "", cta: "", ctaLink: "",
     specialPrice: "", originalPrice: "",
     orderIndex: 0, isPublished: true,
   };
@@ -159,6 +159,11 @@ export function CourseForm({ initial, mode }: { initial: CourseData; mode: "crea
           <div>
             <label className="mb-1.5 block text-sm font-medium text-royal">Dòng CTA (dùng cho khoá "Liên hệ", tuỳ chọn)</label>
             <input type="text" value={c.cta} onChange={(e) => set("cta", e.target.value)} placeholder="💰 Liên hệ để được tư vấn phù hợp" className="input-field" />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-royal">Link cho dòng CTA (tuỳ chọn)</label>
+            <input type="text" value={c.ctaLink} onChange={(e) => set("ctaLink", e.target.value)} placeholder="https://... hoặc /khoa-hoc/ielts-7 hoặc #registration" className="input-field" />
+            <p className="mt-1 text-xs text-muted">Để trống thì dòng CTA vẫn cuộn xuống form đăng ký như cũ. Link ngoài (bắt đầu http) sẽ mở tab mới.</p>
           </div>
         </div>
       ) : (

@@ -20,7 +20,7 @@ export default function EditCoursePage() {
           isSpecial: !!c.isSpecial, badgeOutline: !!c.badgeOutline,
           features: Array.isArray(c.features) && c.features.length ? c.features : [{ icon: "🎯", text: "" }],
           commitment: c.commitment || "", scheduleLabel: c.scheduleLabel || "", schedule: c.schedule || "",
-          price: c.price || "", onlinePrice: c.onlinePrice || "", cta: c.cta || "",
+          price: c.price || "", onlinePrice: c.onlinePrice || "", cta: c.cta || "", ctaLink: c.ctaLink || "",
           specialPrice: c.specialPrice || "", originalPrice: c.originalPrice || "",
           orderIndex: c.orderIndex || 0, isPublished: !!c.isPublished,
         });
