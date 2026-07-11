@@ -1,9 +1,6 @@
 // FILE: src/components/exercise/ExerciseMeta.tsx — Phần thông tin chung dùng cho mọi editor bài tập
 "use client";
-
-import { COURSES } from "@/lib/courses";
-export { COURSES };
-
+import { useLevels } from "@/lib/useLevels";
 export interface MetaState {
   title: string;
   description: string;
@@ -11,17 +8,15 @@ export interface MetaState {
   visibleTo: string[];
   isPublished: boolean;
 }
-
 export function emptyMeta(): MetaState {
   return { title: "", description: "", visibility: "PUBLIC", visibleTo: [], isPublished: false };
 }
-
 interface Props {
   meta: MetaState;
   onChange: (m: MetaState) => void;
 }
-
 export default function ExerciseMeta({ meta, onChange }: Props) {
+  const COURSES = useLevels();
   function set<K extends keyof MetaState>(key: K, val: MetaState[K]) {
     onChange({ ...meta, [key]: val });
   }
@@ -31,7 +26,6 @@ export default function ExerciseMeta({ meta, onChange }: Props) {
       : [...meta.visibleTo, c];
     set("visibleTo", next);
   }
-
   return (
     <div className="card mb-6 space-y-4">
       <div>

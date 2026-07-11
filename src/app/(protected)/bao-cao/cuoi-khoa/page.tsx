@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Plus, Loader2, Pencil, Trash2, Layers } from "lucide-react";
 import { api } from "@/lib/api";
-import { COURSES } from "@/lib/courses";
+import { useLevels } from "@/lib/useLevels";
 export default function FinalReportListPage() {
+  const COURSES = useLevels();
   const [reports, setReports] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Download, TrendingUp, Award, FileText, BookOpen } from "lucide-react";
 import { api } from "@/lib/api";
-import { COURSES } from "@/lib/courses";
+import { useLevels } from "@/lib/useLevels";
 export default function ReportPage() {
+  const COURSES = useLevels();
   const [report, setReport] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [classStudentIds, setClassStudentIds] = useState<Set<string> | null>(null);

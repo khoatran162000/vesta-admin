@@ -5,8 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Printer, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
-import { COURSES as LEVELS } from "@/lib/courses";
-
+import { useLevels } from "@/lib/useLevels";
 const SKILLS = [
   { key: "listening", label: "Nghe" },
   { key: "reading", label: "Đọc" },
@@ -14,22 +13,20 @@ const SKILLS = [
   { key: "speaking", label: "Nói" },
   { key: "overall", label: "Overall" },
 ];
-
 export default function FinalReportSummaryPage() {
+  const LEVELS = useLevels();
   const sp = useSearchParams();
   const [classes, setClasses] = useState<any[]>([]);
   const [classId, setClassId] = useState(sp.get("classId") || "");
   const [course, setCourse] = useState(sp.get("course") || "");
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     (async () => {
       const cl = await api.get("/classes");
       if (cl.success) setClasses(cl.data || []);
     })();
   }, []);
-
   const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -42,10 +39,8 @@ export default function FinalReportSummaryPage() {
     setLoading(false);
   }, [classId, course]);
   useEffect(() => { load(); }, [load]);
-
   const className = classId ? (classes.find((c) => c.id === classId)?.name || "") : "";
   const scopeLabel = classId ? `Lớp ${className}` : (course ? `Trình độ ${course}` : "(tất cả)");
-
   return (
     <div className="mx-auto max-w-[1100px]">
       <div className="mb-4 flex items-center justify-between print:hidden">
@@ -54,10 +49,8 @@ export default function FinalReportSummaryPage() {
         </Link>
         <button onClick={() => window.print()} className="btn-primary"><Printer size={15} />In bảng tổng hợp</button>
       </div>
-
       <h2 className="mb-1 font-display text-2xl font-bold text-royal">Tổng hợp điểm dự đoán cuối khóa</h2>
       <p className="mb-4 text-sm text-muted">Lọc theo lớp cụ thể, hoặc theo trình độ (cho báo cáo chưa gắn lớp).</p>
-
       {/* Bộ lọc: chọn Lớp (ưu tiên) hoặc Trình độ */}
       <div className="mb-6 flex flex-wrap gap-3 print:hidden">
         <div>
@@ -77,10 +70,8 @@ export default function FinalReportSummaryPage() {
           </select>
         </div>
       </div>
-
       <h3 className="mb-1 font-display text-lg font-bold text-royal">Phạm vi: {scopeLabel}</h3>
       <p className="mb-4 text-sm text-muted">{reports.length} học viên đã có báo cáo xuất bản</p>
-
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 size={28} className="animate-spin text-gold" /></div>
       ) : reports.length === 0 ? (

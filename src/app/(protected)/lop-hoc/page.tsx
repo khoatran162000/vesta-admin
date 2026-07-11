@@ -3,18 +3,16 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Save, Loader2, X, BookOpen, FileText, PenTool } from "lucide-react";
 import { api } from "@/lib/api";
-import { COURSES } from "@/lib/courses";
-
+import { useLevels } from "@/lib/useLevels";
 type Section = "diary" | "materials" | "feedback";
-
 export default function ClassContentPage() {
+  const COURSES = useLevels();
   const [section, setSection] = useState<Section>("diary");
   const [course, setCourse] = useState("7+");
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
-
   const loadData = useCallback(async () => {
     setLoading(true);
     let path = "";
@@ -25,9 +23,7 @@ export default function ClassContentPage() {
     setData(json.data || []);
     setLoading(false);
   }, [section, course]);
-
   useEffect(() => { loadData(); }, [loadData]);
-
   async function handleSave(formData: any) {
     let url = "", method: "post" | "put" = "post";
     if (section === "diary") {
@@ -48,19 +44,16 @@ export default function ClassContentPage() {
     setEditItem(null);
     loadData();
   }
-
   async function handleDelete(id: string) {
     if (!confirm("Xác nhận xoá?")) return;
     const url = section === "diary" ? `/class/diaries/${id}` : `/class/materials/${id}`;
     await api.delete(url);
     loadData();
   }
-
   return (
     <div className="mx-auto max-w-[1100px]">
       <h2 className="mb-1 font-display text-2xl font-bold text-royal">Quản Lý Nội Dung Lớp</h2>
       <p className="mb-6 text-sm text-muted">Nhật ký buổi học · Tài liệu · Chấm bài / phản hồi</p>
-
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <div className="flex gap-1 rounded-xl border border-silver/30 bg-white p-1">
           {([
@@ -74,21 +67,18 @@ export default function ClassContentPage() {
             </button>
           ))}
         </div>
-
         {section !== "feedback" && (
           <select value={course} onChange={(e) => setCourse(e.target.value)}
             className="rounded-lg border border-silver/40 bg-white px-4 py-2 text-sm outline-none focus:border-gold">
             {COURSES.map((c) => <option key={c} value={c}>Khoá {c}</option>)}
           </select>
         )}
-
         {section !== "feedback" && (
           <button onClick={() => { setEditItem(null); setShowModal(true); }} className="btn-primary ml-auto">
             <Plus size={16} />{section === "diary" ? "Thêm buổi học" : "Thêm tài liệu"}
           </button>
         )}
       </div>
-
       <div className="overflow-hidden rounded-xl border border-silver/30 bg-white">
         {loading ? (
           <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-gold" /></div>
@@ -178,25 +168,21 @@ export default function ClassContentPage() {
           </table>
         )}
       </div>
-
       {showModal && (
         <Modal section={section} item={editItem} onClose={() => { setShowModal(false); setEditItem(null); }} onSave={handleSave} />
       )}
     </div>
   );
 }
-
 function Modal({ section, item, onClose, onSave }: { section: Section; item: any; onClose: () => void; onSave: (d: any) => void }) {
   const [form, setForm] = useState<any>(item || {});
   const [saving, setSaving] = useState(false);
   const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));
-
   async function handleSubmit() {
     setSaving(true);
     await onSave(form);
     setSaving(false);
   }
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 px-4">
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
@@ -208,7 +194,6 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
           </h3>
           <button onClick={onClose} className="text-muted hover:text-royal"><X size={20} /></button>
         </div>
-
         <div className="space-y-3">
           {section === "diary" && (<>
             <div className="grid grid-cols-2 gap-3">
@@ -240,7 +225,6 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
               </div>
             </div>
           </>)}
-
           {section === "materials" && (<>
             <div>
               <label className="mb-1 block text-xs font-bold text-muted">Tên tài liệu</label>
@@ -272,7 +256,6 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
               </div>
             </div>
           </>)}
-
           {section === "feedback" && (<>
             <div className="rounded-lg bg-cream p-3">
               <p className="text-xs font-bold text-muted">Học viên: <span className="text-royal">{item?.student?.fullName} ({item?.student?.studentCode})</span></p>
@@ -294,7 +277,6 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
             </div>
           </>)}
         </div>
-
         <div className="mt-5 flex items-center justify-end gap-3">
           <button onClick={onClose} className="btn-secondary">Huỷ</button>
           <button onClick={handleSubmit} disabled={saving} className="btn-primary">

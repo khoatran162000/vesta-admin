@@ -24,6 +24,7 @@ const NAV: NavItem[] = [
     { href: "/lop-hoc-moi", label: "Quản lý lớp học" },
     { href: "/lop-hoc", label: "Nội dung lớp" },
     { href: "/lich-hoc", label: "Lịch học cả năm" },
+    { href: "/trinh-do", label: "Trình độ" },
   ]},
   { label: "Ngân hàng đề", icon: BookOpen, children: [
     { href: "/ngan-hang-de/categories", label: "Danh mục" },

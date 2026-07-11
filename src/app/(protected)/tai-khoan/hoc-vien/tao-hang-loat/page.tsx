@@ -4,45 +4,39 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Users, Loader2, CheckCircle, Copy, Download } from "lucide-react";
 import { api } from "@/lib/api";
-import { COURSES } from "@/lib/courses";
-
+import { useLevels } from "@/lib/useLevels";
 interface Account {
   fullName: string;
   studentCode: string;
   password: string;
   phone: string;
 }
-
 export default function BatchCreatePage() {
+  const COURSES = useLevels();
   const [input, setInput] = useState("");
   const [course, setCourse] = useState("6+");
   const [creating, setCreating] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
-
   async function handleCreate() {
     const lines = input.trim().split("\n").filter((l) => l.trim());
     if (lines.length === 0) { alert("Vui lòng nhập danh sách"); return; }
     setCreating(true);
     setAccounts([]);
     setErrors([]);
-
     const newAccounts: Account[] = [];
     const newErrors: string[] = [];
-
     for (let i = 0; i < lines.length; i++) {
       const parts = lines[i].split(/[,\t]/).map((s) => s.trim());
       let fullName = "", phone = "", email = "";
       if (parts.length >= 3) { fullName = parts[0]; email = parts[1]; phone = parts[2]; }
       else if (parts.length === 2) { fullName = parts[0]; phone = parts[1]; }
       else { fullName = parts[0]; phone = ""; }
-
       if (!fullName || !phone) {
         newErrors.push(`Dòng ${i + 1}: Thiếu họ tên hoặc SĐT — "${lines[i]}"`);
         continue;
       }
-
       try {
         const data = await api.post("/register", { fullName, email: email || undefined, phone, course });
         if (data.success && data.data) {
@@ -59,19 +53,16 @@ export default function BatchCreatePage() {
         newErrors.push(`Dòng ${i + 1}: ${fullName} — Lỗi kết nối`);
       }
     }
-
     setAccounts(newAccounts);
     setErrors(newErrors);
     setCreating(false);
   }
-
   function copyAll() {
     const text = accounts.map((a) => `${a.fullName}\t${a.studentCode}\t${a.password}`).join("\n");
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
-
   function downloadCSV() {
     const csv = "Họ tên,Mã học viên,Mật khẩu,SĐT\n" +
       accounts.map((a) => `"${a.fullName}","${a.studentCode}","${a.password}","${a.phone}"`).join("\n");
@@ -82,7 +73,6 @@ export default function BatchCreatePage() {
     link.download = `tai-khoan-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
   }
-
   return (
     <div className="mx-auto max-w-[900px]">
       <Link href="/tai-khoan/hoc-vien" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-royal">
@@ -90,7 +80,6 @@ export default function BatchCreatePage() {
       </Link>
       <h2 className="mb-2 font-display text-2xl font-bold text-royal">👥 Tạo Tài Khoản Hàng Loạt</h2>
       <p className="mb-6 text-sm text-muted">Dán danh sách học viên, mỗi dòng 1 người. Hệ thống tự tạo mã HV + mật khẩu = SĐT.</p>
-
       {accounts.length === 0 ? (
         <>
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3">
@@ -100,7 +89,6 @@ export default function BatchCreatePage() {
             <p className="mt-1 text-xs text-amber-700">Phân cách bằng dấu phẩy hoặc tab.</p>
             <pre className="mt-1 text-xs text-amber-800">Trần Ngọc Khoa, 0838779988{"\n"}Lê Hương Ly, ly@gmail.com, 0336781368</pre>
           </div>
-
           <div className="mb-4">
             <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Khoá học mặc định</label>
             <select value={course} onChange={(e) => setCourse(e.target.value)}
@@ -108,11 +96,9 @@ export default function BatchCreatePage() {
               {COURSES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-
           <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={10}
             placeholder={"Trần Ngọc Khoa, 0838779988\nLê Hương Ly, ly@gmail.com, 0336781368"}
             className="input-field mb-4 resize-y font-mono" />
-
           <button onClick={handleCreate} disabled={creating || !input.trim()}
             className="btn-primary w-full justify-center py-3.5">
             {creating ? <><Loader2 size={16} className="animate-spin" />Đang tạo...</> : <><Users size={16} />Tạo {input.trim().split("\n").filter((l) => l.trim()).length} tài khoản</>}
@@ -131,7 +117,6 @@ export default function BatchCreatePage() {
               <p className="text-xs text-red-500">Lỗi / Bỏ qua</p>
             </div>
           </div>
-
           <div className="mb-4 flex gap-2">
             <button onClick={copyAll} className="btn-secondary flex-1 justify-center">
               {copied ? <><CheckCircle size={14} className="text-green-600" /><span className="text-green-600">Đã copy!</span></> : <><Copy size={14} />Copy tất cả</>}
@@ -140,13 +125,11 @@ export default function BatchCreatePage() {
               <Download size={14} />Tải CSV
             </button>
           </div>
-
           {errors.length > 0 && (
             <div className="mb-4 rounded-xl border border-red-200 bg-white p-3">
               {errors.map((e, i) => <p key={i} className="text-xs text-red-500">{e}</p>)}
             </div>
           )}
-
           <div className="overflow-hidden rounded-xl border border-silver/20 bg-white">
             <table className="w-full text-left text-sm">
               <thead><tr className="border-b bg-cream">
@@ -165,7 +148,6 @@ export default function BatchCreatePage() {
               </tbody>
             </table>
           </div>
-
           <button onClick={() => { setAccounts([]); setErrors([]); setInput(""); }}
             className="btn-secondary mt-4 w-full justify-center py-3">
             Tạo thêm

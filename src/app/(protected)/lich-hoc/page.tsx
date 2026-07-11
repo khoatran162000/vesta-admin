@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Save, Loader2, X, PenTool } from "lucide-react";
 import { api } from "@/lib/api";
-import { COURSES } from "@/lib/courses";
+import { useLevels } from "@/lib/useLevels";
 
 const STATUS_OPTIONS = [
   { value: "UPCOMING", label: "Sắp khai giảng", color: "bg-blue-50 text-blue-700" },
@@ -13,6 +13,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function SchedulePage() {
+  const COURSES = useLevels();
   const [schedules, setSchedules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState({ course: "", status: "", year: String(new Date().getFullYear()) });
@@ -132,6 +133,7 @@ export default function SchedulePage() {
 }
 
 function ScheduleModal({ item, onClose, onSave }: { item: any; onClose: () => void; onSave: (d: any) => void }) {
+  const COURSES = useLevels();
   const [form, setForm] = useState<any>(item || { maxStudents: 15, status: "UPCOMING" });
   const [saving, setSaving] = useState(false);
   const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));

@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Loader2, Plus, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
-import { COURSES } from "@/lib/courses";
-
+import { useLevels } from "@/lib/useLevels";
 interface Feature { icon: string; text: string; }
 export interface CourseData {
   id?: string;
@@ -19,7 +18,6 @@ export interface CourseData {
   specialPrice: string; originalPrice: string;
   orderIndex: number; isPublished: boolean;
 }
-
 export function emptyCourse(): CourseData {
   return {
     cardType: "FULL", title: "", badge: "",
@@ -31,24 +29,20 @@ export function emptyCourse(): CourseData {
     orderIndex: 0, isPublished: true,
   };
 }
-
 const ICON_SUGGEST = ["🎯", "📚", "✏️", "💡", "🧠", "📝", "💎", "👩‍🏫", "📊", "🖥️", "🎁", "🧑", "🚀"];
-
 export function CourseForm({ initial, mode }: { initial: CourseData; mode: "create" | "edit" }) {
   const router = useRouter();
   const [c, setC] = useState<CourseData>(initial);
+  const COURSES = useLevels();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
   function set<K extends keyof CourseData>(k: K, v: CourseData[K]) { setC((p) => ({ ...p, [k]: v })); }
   function setFeat(i: number, field: keyof Feature, v: string) {
     setC((p) => ({ ...p, features: p.features.map((f, x) => x === i ? { ...f, [field]: v } : f) }));
   }
   function addFeat() { setC((p) => ({ ...p, features: [...p.features, { icon: "💡", text: "" }] })); }
   function removeFeat(i: number) { setC((p) => ({ ...p, features: p.features.filter((_, x) => x !== i) })); }
-
   const isSupport = c.cardType === "SUPPORT";
-
   async function handleSave() {
     if (!c.title.trim()) return setError("Vui lòng nhập tên khoá học");
     const features = c.features.filter((f) => f.text.trim());
@@ -62,7 +56,6 @@ export function CourseForm({ initial, mode }: { initial: CourseData; mode: "crea
     if (res.success) router.push("/khoa-hoc");
     else setError(res.message || "Lỗi lưu khoá học");
   }
-
   return (
     <div className="mx-auto max-w-[820px]">
       <div className="mb-6 flex items-center gap-3">
@@ -70,7 +63,6 @@ export function CourseForm({ initial, mode }: { initial: CourseData; mode: "crea
         <h2 className="font-display text-2xl font-bold text-royal">{mode === "create" ? "Thêm khoá học" : "Sửa khoá học"}</h2>
       </div>
       {error && <p className="mb-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
-
       {/* Cơ bản */}
       <div className="card space-y-4">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_180px]">
@@ -117,7 +109,6 @@ export function CourseForm({ initial, mode }: { initial: CourseData; mode: "crea
           </label>
         </div>
       </div>
-
       {/* Đặc điểm (features) */}
       <div className="card mt-5">
         <div className="mb-3 flex items-center justify-between">
@@ -136,7 +127,6 @@ export function CourseForm({ initial, mode }: { initial: CourseData; mode: "crea
         </div>
         <p className="mt-2 text-xs text-muted">Icon là emoji, gõ trực tiếp hoặc chọn gợi ý. Gợi ý: {ICON_SUGGEST.join(" ")}</p>
       </div>
-
       {/* Trường riêng theo dạng */}
       {!isSupport ? (
         <div className="card mt-5 space-y-4">
@@ -186,7 +176,6 @@ export function CourseForm({ initial, mode }: { initial: CourseData; mode: "crea
           </div>
         </div>
       )}
-
       <div className="mt-6 flex items-center justify-end gap-3 border-t border-silver/20 pt-6">
         <Link href="/khoa-hoc" className="btn-secondary">Huỷ</Link>
         <button onClick={handleSave} disabled={saving} className="btn-primary">

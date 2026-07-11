@@ -4,21 +4,19 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Plus, Loader2, Pencil, Trash2, Users, X, Save } from "lucide-react";
 import { api } from "@/lib/api";
-import { COURSES as LEVELS } from "@/lib/courses";
-
+import { useLevels } from "@/lib/useLevels";
 interface ClassRow {
   id: string; name: string; classCode: string | null; course: string | null;
   teacher: string | null; schedule: string | null; status: string;
   _count?: { enrollments: number };
 }
-
 export default function ClassListPage() {
+  const LEVELS = useLevels();
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterCourse, setFilterCourse] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<any>(null);
-
   const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -28,7 +26,6 @@ export default function ClassListPage() {
     setLoading(false);
   }, [filterCourse]);
   useEffect(() => { load(); }, [load]);
-
   function openCreate() {
     setEditing({ name: "", classCode: "", course: "", teacher: "", schedule: "", room: "", startDate: "", maxStudents: "", status: "ACTIVE", notes: "" });
     setFormOpen(true);
@@ -42,7 +39,6 @@ export default function ClassListPage() {
     });
     setFormOpen(true);
   }
-
   async function save() {
     if (!editing.name.trim()) return alert("Vui lòng nhập tên lớp");
     const payload = { ...editing };
@@ -57,7 +53,6 @@ export default function ClassListPage() {
     const res = await api.delete(`/classes/${id}`);
     if (res.success) load(); else alert(res.message || "Lỗi xoá");
   }
-
   return (
     <div className="mx-auto max-w-[1100px]">
       <div className="mb-6 flex items-center justify-between">
@@ -67,7 +62,6 @@ export default function ClassListPage() {
         </div>
         <button onClick={openCreate} className="btn-primary"><Plus size={16} />Tạo lớp</button>
       </div>
-
       <div className="mb-4">
         <select value={filterCourse} onChange={(e) => setFilterCourse(e.target.value)}
           className="rounded-lg border border-silver/40 bg-white px-4 py-2 text-sm outline-none focus:border-gold">
@@ -75,7 +69,6 @@ export default function ClassListPage() {
           {LEVELS.map((c) => <option key={c} value={c}>Trình độ {c}</option>)}
         </select>
       </div>
-
       <div className="overflow-x-auto rounded-xl border border-silver/30 bg-white">
         {loading ? (
           <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-gold" /></div>
@@ -126,7 +119,6 @@ export default function ClassListPage() {
           </table>
         )}
       </div>
-
       {/* Modal tạo/sửa lớp */}
       {formOpen && editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setFormOpen(false)}>
