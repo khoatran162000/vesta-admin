@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Loader2, Plus, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { COURSES } from "@/lib/courses";
 
 interface Feature { icon: string; text: string; }
 export interface CourseData {
@@ -14,7 +15,7 @@ export interface CourseData {
   isSpecial: boolean; badgeOutline: boolean;
   features: Feature[];
   commitment: string; scheduleLabel: string; schedule: string;
-  price: string; onlinePrice: string; cta: string; ctaLink: string;
+  price: string; onlinePrice: string; cta: string; ctaLink: string; level: string;
   specialPrice: string; originalPrice: string;
   orderIndex: number; isPublished: boolean;
 }
@@ -25,7 +26,7 @@ export function emptyCourse(): CourseData {
     isSpecial: false, badgeOutline: false,
     features: [{ icon: "🎯", text: "" }],
     commitment: "", scheduleLabel: "THỜI LƯỢNG", schedule: "",
-    price: "", onlinePrice: "", cta: "", ctaLink: "",
+    price: "", onlinePrice: "", cta: "", ctaLink: "", level: "",
     specialPrice: "", originalPrice: "",
     orderIndex: 0, isPublished: true,
   };
@@ -83,6 +84,13 @@ export function CourseForm({ initial, mode }: { initial: CourseData; mode: "crea
               <option value="FULL">Full — thẻ rộng</option>
               <option value="HALF">Half — thẻ nửa (2 cột)</option>
               <option value="SUPPORT">Hỗ trợ — thẻ vàng</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-royal">Trình độ (để nối lớp học)</label>
+            <select value={c.level} onChange={(e) => set("level", e.target.value)} className="input-field">
+              <option value="">— Không gắn trình độ —</option>
+              {COURSES.map((lv) => <option key={lv} value={lv}>{lv}</option>)}
             </select>
           </div>
         </div>
