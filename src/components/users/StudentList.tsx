@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Search, Lock, Unlock, Pencil, Loader2, Upload, FileDown, LineChart, KeyRound, Eye, EyeOff } from "lucide-react";
+import { Plus, Search, Lock, Unlock, Pencil, Loader2, Upload, FileDown, LineChart, KeyRound, Eye, EyeOff, Users, Trash2, X } from "lucide-react";
 import * as XLSX from "xlsx";
 import { api } from "@/lib/api";
 interface Student {
@@ -18,6 +18,7 @@ export function StudentList() {
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
   const [includeHidden, setIncludeHidden] = useState(false);
+  const [classModal, setClassModal] = useState<Student | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -169,6 +170,8 @@ export function StudentList() {
                         className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Pencil size={15} /></Link>
                       <button onClick={() => handleReset(u.id, u.fullName)} title="Đặt lại mật khẩu"
                         className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><KeyRound size={15} /></button>
+                      <button onClick={() => setClassModal(u)} title="Quản lý lớp"
+                        className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Users size={15} /></button>
                       <button onClick={() => handleToggle(u.id)} title={u.isActive ? "Ẩn học viên" : "Hiện lại"}
                         className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal">
                         {u.isActive ? <Lock size={15} /> : <Unlock size={15} />}
@@ -208,6 +211,86 @@ export function StudentList() {
           </form>
         </div>
       )}
+      {classModal && (
+        <StudentClassModal student={classModal} onClose={() => setClassModal(null)} />
+      )}
+    </div>
+  );
+}
+
+function StudentClassModal({ student, onClose }: { student: any; onClose: () => void }) {
+  const [myClasses, setMyClasses] = useState<any[]>([]);
+  const [allClasses, setAllClasses] = useState<any[]>([]);
+  const [addId, setAddId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [mine, all] = await Promise.all([
+      api.get(`/classes/of-student/${student.id}`),
+      api.get(`/classes`),
+    ]);
+    if (mine.success) setMyClasses(mine.data || []);
+    if (all.success) setAllClasses(all.data || []);
+    setLoading(false);
+  }, [student.id]);
+  useEffect(() => { load(); }, [load]);
+  async function addToClass() {
+    if (!addId) return;
+    const res = await api.post(`/classes/${addId}/enroll`, { studentIds: [student.id] });
+    if (res.success) { setAddId(""); load(); }
+    else alert(res.message || "Lỗi thêm vào lớp");
+  }
+  async function removeFromClass(classId: string) {
+    if (!confirm("Gỡ học viên khỏi lớp này?")) return;
+    const res = await api.delete(`/classes/${classId}/students/${student.id}`);
+    if (res.success) load();
+    else alert(res.message || "Lỗi gỡ");
+  }
+  const myIds = new Set(myClasses.map((c) => c.id));
+  const available = allClasses.filter((c) => !myIds.has(c.id));
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 px-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="font-display text-xl font-bold text-royal">Quản lý lớp</h3>
+            <p className="text-xs text-muted">{student.fullName} ({student.studentCode})</p>
+          </div>
+          <button onClick={onClose} className="text-muted hover:text-royal"><X size={20} /></button>
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin text-gold" /></div>
+        ) : (
+          <>
+            <p className="mb-1 text-xs font-bold uppercase tracking-wider text-muted">Lớp đang thuộc</p>
+            {myClasses.length === 0 ? (
+              <p className="mb-3 text-sm text-muted">Chưa thuộc lớp nào.</p>
+            ) : (
+              <div className="mb-3 space-y-1.5">
+                {myClasses.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between rounded-lg border border-silver/30 px-3 py-2">
+                    <span className="text-sm font-medium text-[#1a1a2e]">{c.name}
+                      {c.course && <span className="ml-1 text-xs text-muted">({c.course})</span>}</span>
+                    <button onClick={() => removeFromClass(c.id)} title="Gỡ khỏi lớp"
+                      className="rounded p-1 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="mb-1 text-xs font-bold uppercase tracking-wider text-muted">Thêm vào lớp</p>
+            <div className="flex gap-2">
+              <select value={addId} onChange={(e) => setAddId(e.target.value)} className="input-field flex-1">
+                <option value="">— Chọn lớp —</option>
+                {available.map((c) => <option key={c.id} value={c.id}>{c.name}{c.course ? ` (${c.course})` : ""}</option>)}
+              </select>
+              <button onClick={addToClass} disabled={!addId} className="btn-primary disabled:opacity-40"><Plus size={14} />Thêm</button>
+            </div>
+          </>
+        )}
+        <div className="mt-5 flex justify-end">
+          <button onClick={onClose} className="btn-secondary">Đóng</button>
+        </div>
+      </div>
     </div>
   );
 }
