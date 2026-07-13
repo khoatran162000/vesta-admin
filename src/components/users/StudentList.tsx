@@ -1,4 +1,4 @@
-// FILE: src/components/users/StudentList.tsx — Quản lý học viên (tách riêng, có điểm đầu vào / Excel / theo dõi)
+// FILE: src/components/users/StudentList.tsx — Quản lý học viên (điểm đầu vào / Excel / theo dõi / quản lý lớp / chọn lô)
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -19,6 +19,8 @@ export function StudentList() {
   const [page, setPage] = useState(1);
   const [includeHidden, setIncludeHidden] = useState(false);
   const [classModal, setClassModal] = useState<Student | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkModal, setBulkModal] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -37,12 +39,30 @@ export function StudentList() {
       const data = await api.get(`/users?${params}`);
       if (data.success) { setUsers(data.data); setTotal(data.meta.total); }
     } catch {} finally { setLoading(false); }
-  }, [page, search]);
+  }, [page, search, includeHidden]);
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
   useEffect(() => {
     const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 400);
     return () => clearTimeout(t);
   }, [searchInput]);
+  // Đổi trang/tìm kiếm/toggle ẩn → xoá lựa chọn (tránh chọn lô cross-page nhầm)
+  useEffect(() => { setSelected(new Set()); }, [page, search, includeHidden]);
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  const allVisibleSelected = users.length > 0 && users.every((u) => selected.has(u.id));
+  function toggleAll() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) users.forEach((u) => next.delete(u.id));
+      else users.forEach((u) => next.add(u.id));
+      return next;
+    });
+  }
   async function handleToggle(id: string) {
     await api.patch(`/users/${id}/toggle-status`);
     fetchUsers();
@@ -76,14 +96,12 @@ export function StudentList() {
   }
   // Xuất Excel: lấy TẤT CẢ học viên (không phân trang) rồi xuất .xlsx
   async function exportExcel() {
-    const params = new URLSearchParams({ role: "STUDENT", page: "1", limit: "50" });
-    if (search) params.set("search", search);
-    // gom hết các trang
     let all: Student[] = [];
     let p = 1;
     while (true) {
       const q = new URLSearchParams({ role: "STUDENT", page: String(p), limit: "50" });
       if (search) q.set("search", search);
+      if (includeHidden) q.set("includeHidden", "1");
       const data = await api.get(`/users?${q}`);
       if (!data.success || !data.data?.length) break;
       all = all.concat(data.data);
@@ -127,6 +145,15 @@ export function StudentList() {
         <input type="text" value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
           placeholder="Tìm theo tên, mã HV, SĐT..." className="input-field pl-9" />
       </div>
+      {selected.size > 0 && (
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-gold/30 bg-gold/5 px-4 py-3">
+          <span className="text-sm font-medium text-royal">Đã chọn {selected.size} học viên</span>
+          <div className="flex gap-2">
+            <button onClick={() => setBulkModal(true)} className="btn-primary"><Users size={14} />Thêm vào lớp</button>
+            <button onClick={() => setSelected(new Set())} className="btn-secondary">Bỏ chọn</button>
+          </div>
+        </div>
+      )}
       <div className="card overflow-hidden !p-0">
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 size={22} className="animate-spin text-gold" /></div>
@@ -134,6 +161,10 @@ export function StudentList() {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-silver/20 bg-cream">
+                <th className="w-10 px-4 py-3">
+                  <input type="checkbox" checked={allVisibleSelected} onChange={toggleAll}
+                    className="h-4 w-4 rounded border-silver text-royal focus:ring-royal" />
+                </th>
                 <th className="px-4 py-3 font-semibold text-royal">Mã HV</th>
                 <th className="px-4 py-3 font-semibold text-royal">Họ tên</th>
                 <th className="px-4 py-3 font-semibold text-royal">SĐT</th>
@@ -145,7 +176,11 @@ export function StudentList() {
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-b border-silver/10 hover:bg-cream/50">
+                <tr key={u.id} className={`border-b border-silver/10 hover:bg-cream/50 ${selected.has(u.id) ? "bg-gold/5" : ""}`}>
+                  <td className="px-4 py-3">
+                    <input type="checkbox" checked={selected.has(u.id)} onChange={() => toggleOne(u.id)}
+                      className="h-4 w-4 rounded border-silver text-royal focus:ring-royal" />
+                  </td>
                   <td className="px-4 py-3">
                     <span className="rounded bg-royal/8 px-2 py-0.5 text-xs font-semibold text-royal">{u.studentCode || "—"}</span>
                   </td>
@@ -213,6 +248,13 @@ export function StudentList() {
       )}
       {classModal && (
         <StudentClassModal student={classModal} onClose={() => setClassModal(null)} />
+      )}
+      {bulkModal && (
+        <BulkAddClassModal
+          studentIds={[...selected]}
+          onClose={() => setBulkModal(false)}
+          onDone={() => { setBulkModal(false); setSelected(new Set()); alert("Đã thêm học viên vào lớp"); }}
+        />
       )}
     </div>
   );
@@ -289,6 +331,56 @@ function StudentClassModal({ student, onClose }: { student: any; onClose: () => 
         )}
         <div className="mt-5 flex justify-end">
           <button onClick={onClose} className="btn-secondary">Đóng</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BulkAddClassModal({ studentIds, onClose, onDone }: { studentIds: string[]; onClose: () => void; onDone: () => void }) {
+  const [allClasses, setAllClasses] = useState<any[]>([]);
+  const [addId, setAddId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    (async () => {
+      const all = await api.get(`/classes`);
+      if (all.success) setAllClasses(all.data || []);
+      setLoading(false);
+    })();
+  }, []);
+  async function submit() {
+    if (!addId) return;
+    setSaving(true);
+    const res = await api.post(`/classes/${addId}/enroll`, { studentIds });
+    setSaving(false);
+    if (res.success) onDone();
+    else alert(res.message || "Lỗi thêm vào lớp");
+  }
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 px-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-display text-xl font-bold text-royal">Thêm {studentIds.length} học viên vào lớp</h3>
+          <button onClick={onClose} className="text-muted hover:text-royal"><X size={20} /></button>
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin text-gold" /></div>
+        ) : (
+          <>
+            <p className="mb-1 text-xs font-bold uppercase tracking-wider text-muted">Chọn lớp</p>
+            <select value={addId} onChange={(e) => setAddId(e.target.value)} className="input-field w-full">
+              <option value="">— Chọn lớp —</option>
+              {allClasses.map((c) => <option key={c.id} value={c.id}>{c.name}{c.course ? ` (${c.course})` : ""}</option>)}
+            </select>
+            <p className="mt-2 text-xs text-muted">Học viên đã có trong lớp sẽ được bỏ qua, không bị trùng.</p>
+          </>
+        )}
+        <div className="mt-5 flex justify-end gap-3">
+          <button onClick={onClose} className="btn-secondary">Huỷ</button>
+          <button onClick={submit} disabled={!addId || saving} className="btn-primary disabled:opacity-40">
+            {saving ? "Đang thêm..." : "Thêm vào lớp"}
+          </button>
         </div>
       </div>
     </div>
