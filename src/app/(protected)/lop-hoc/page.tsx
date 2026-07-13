@@ -177,6 +177,7 @@ export default function ClassContentPage() {
 function Modal({ section, item, onClose, onSave }: { section: Section; item: any; onClose: () => void; onSave: (d: any) => void }) {
   const [form, setForm] = useState<any>(item || {});
   const [saving, setSaving] = useState(false);
+  const [diaryMode, setDiaryMode] = useState<"form" | "html">(item?.contentHtml ? "html" : "form");
   const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));
   async function handleSubmit() {
     setSaving(true);
@@ -196,6 +197,12 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
         </div>
         <div className="space-y-3">
           {section === "diary" && (<>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setDiaryMode("form")}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${diaryMode === "form" ? "border-royal bg-royal text-white" : "border-silver/40 text-muted"}`}>Nhập thường</button>
+              <button type="button" onClick={() => setDiaryMode("html")}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${diaryMode === "html" ? "border-royal bg-royal text-white" : "border-silver/40 text-muted"}`}>Dán HTML</button>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-xs font-bold text-muted">Buổi số</label>
@@ -206,24 +213,33 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
                 <input type="date" value={form.date?.slice?.(0, 10) || ""} onChange={(e) => set("date", e.target.value)} className="input-field" />
               </div>
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-muted">Nội dung buổi học</label>
-              <textarea value={form.topic || ""} onChange={(e) => set("topic", e.target.value)} rows={3} className="input-field" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-muted">BTVN</label>
-              <textarea value={form.homework || ""} onChange={(e) => set("homework", e.target.value)} rows={2} className="input-field" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+            {diaryMode === "form" ? (<>
               <div>
-                <label className="mb-1 block text-xs font-bold text-muted">Thời lượng</label>
-                <input type="text" value={form.duration || ""} onChange={(e) => set("duration", e.target.value)} placeholder="2.5h" className="input-field" />
+                <label className="mb-1 block text-xs font-bold text-muted">Nội dung buổi học</label>
+                <textarea value={form.topic || ""} onChange={(e) => set("topic", e.target.value)} rows={3} className="input-field" />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-bold text-muted">Ghi chú GV</label>
-                <input type="text" value={form.teacherNote || ""} onChange={(e) => set("teacherNote", e.target.value)} className="input-field" />
+                <label className="mb-1 block text-xs font-bold text-muted">BTVN</label>
+                <textarea value={form.homework || ""} onChange={(e) => set("homework", e.target.value)} rows={2} className="input-field" />
               </div>
-            </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-muted">Thời lượng</label>
+                  <input type="text" value={form.duration || ""} onChange={(e) => set("duration", e.target.value)} placeholder="2.5h" className="input-field" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-bold text-muted">Ghi chú GV</label>
+                  <input type="text" value={form.teacherNote || ""} onChange={(e) => set("teacherNote", e.target.value)} className="input-field" />
+                </div>
+              </div>
+            </>) : (
+              <div>
+                <label className="mb-1 block text-xs font-bold text-muted">Mã HTML nội dung buổi học</label>
+                <textarea value={form.contentHtml || ""} onChange={(e) => set("contentHtml", e.target.value)} rows={8}
+                  placeholder="<div>...</div>" className="input-field font-mono text-xs" />
+                <p className="mt-1 text-[0.7rem] text-muted">Học viên sẽ thấy đúng giao diện HTML này. Vẫn nên điền Buổi số + Ngày ở trên.</p>
+              </div>
+            )}
           </>)}
           {section === "materials" && (<>
             <div>
