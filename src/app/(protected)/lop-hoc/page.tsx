@@ -5,6 +5,25 @@ import { Plus, Trash2, Save, Loader2, X, BookOpen, FileText, PenTool } from "luc
 import { api } from "@/lib/api";
 import { useLevels } from "@/lib/useLevels";
 type Section = "diary" | "materials" | "feedback";
+
+// Parse bảng điểm dán từ Excel/Sheets: mỗi dòng 1 HS, cột tách bằng tab
+function parseScoreTable(text: string): { name: string; vocab: string; attitude: string; score: string }[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const cols = line.split("\t");
+      return {
+        name: (cols[0] || "").trim(),
+        vocab: (cols[1] || "").trim(),
+        attitude: (cols[2] || "").trim(),
+        score: (cols[3] || "").trim(),
+      };
+    })
+    .filter((r) => r.name); // bỏ dòng không có tên
+}
+
 export default function ClassContentPage() {
   const COURSES = useLevels();
   const [section, setSection] = useState<Section>("diary");
@@ -231,6 +250,38 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
                   <label className="mb-1 block text-xs font-bold text-muted">Ghi chú GV</label>
                   <input type="text" value={form.teacherNote || ""} onChange={(e) => set("teacherNote", e.target.value)} className="input-field" />
                 </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold text-muted">Bảng điểm học sinh (chỉ GV xem — không hiện cho học viên)</label>
+                <textarea
+                  rows={4}
+                  placeholder="Dán từ Excel: mỗi dòng 1 HS, các cột Tên — Từ vựng — Ý thức & ghi bài — Điểm (cách nhau bằng tab)"
+                  onChange={(e) => set("scoreTable", parseScoreTable(e.target.value))}
+                  className="input-field font-mono text-xs" />
+                <p className="mt-1 text-[0.7rem] text-muted">Copy vùng 4 cột từ Excel/Google Sheets rồi dán vào đây. Xem trước ở dưới.</p>
+                {Array.isArray(form.scoreTable) && form.scoreTable.length > 0 && (
+                  <div className="mt-2 overflow-x-auto rounded-lg border border-silver/20">
+                    <table className="w-full text-left text-xs">
+                      <thead><tr className="border-b bg-cream">
+                        <th className="px-2 py-1.5 font-semibold text-royal">Tên HS</th>
+                        <th className="px-2 py-1.5 font-semibold text-royal">Từ vựng</th>
+                        <th className="px-2 py-1.5 font-semibold text-royal">Ý thức & ghi bài</th>
+                        <th className="px-2 py-1.5 font-semibold text-royal">Điểm</th>
+                      </tr></thead>
+                      <tbody>
+                        {form.scoreTable.map((r: any, i: number) => (
+                          <tr key={i} className="border-b border-silver/10">
+                            <td className="px-2 py-1 font-medium text-[#1a1a2e]">{r.name}</td>
+                            <td className="px-2 py-1 text-muted">{r.vocab}</td>
+                            <td className="px-2 py-1 text-muted">{r.attitude}</td>
+                            <td className="px-2 py-1 font-bold text-royal">{r.score}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <p className="px-2 py-1 text-[0.7rem] text-muted">{form.scoreTable.length} học sinh</p>
+                  </div>
+                )}
               </div>
             </>) : (
               <div>
