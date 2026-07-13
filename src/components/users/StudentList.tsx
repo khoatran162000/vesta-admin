@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Search, Lock, Unlock, Pencil, Loader2, Upload, FileDown, LineChart } from "lucide-react";
+import { Plus, Search, Lock, Unlock, Pencil, Loader2, Upload, FileDown, LineChart, KeyRound, Eye, EyeOff } from "lucide-react";
 import * as XLSX from "xlsx";
 import { api } from "@/lib/api";
 interface Student {
@@ -17,6 +17,7 @@ export function StudentList() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
+  const [includeHidden, setIncludeHidden] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -31,6 +32,7 @@ export function StudentList() {
     try {
       const params = new URLSearchParams({ role: "STUDENT", page: String(page), limit: "20" });
       if (search) params.set("search", search);
+      if (includeHidden) params.set("includeHidden", "1");
       const data = await api.get(`/users?${params}`);
       if (data.success) { setUsers(data.data); setTotal(data.meta.total); }
     } catch {} finally { setLoading(false); }
@@ -43,6 +45,15 @@ export function StudentList() {
   async function handleToggle(id: string) {
     await api.patch(`/users/${id}/toggle-status`);
     fetchUsers();
+  }
+  async function handleReset(id: string, name: string) {
+    if (!confirm(`Đặt lại mật khẩu cho "${name}"?`)) return;
+    const data = await api.post(`/users/${id}/reset-password`, {});
+    if (data.success) {
+      prompt(`Mật khẩu mới của ${name} (copy đưa học viên):`, data.data.newPassword);
+    } else {
+      alert(data.message || "Lỗi đặt lại mật khẩu");
+    }
   }
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault(); setCreating(true); setMsg("");
@@ -102,6 +113,9 @@ export function StudentList() {
           <p className="text-sm text-muted">{total} tài khoản</p>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={() => { setIncludeHidden((v) => !v); setPage(1); }} className="btn-secondary">
+            {includeHidden ? <EyeOff size={15} /> : <Eye size={15} />}{includeHidden ? "Ẩn HS đã ẩn" : "Xem cả HS đã ẩn"}
+          </button>
           <button onClick={exportExcel} className="btn-secondary"><FileDown size={15} />Xuất Excel</button>
           <Link href="/tai-khoan/hoc-vien/import" className="btn-secondary"><Upload size={15} />Import</Link>
           <button onClick={() => setShowCreate(true)} className="btn-primary"><Plus size={15} />Tạo tài khoản</button>
@@ -153,6 +167,8 @@ export function StudentList() {
                         className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><LineChart size={15} /></Link>
                       <Link href={`/tai-khoan/${u.id}`} title="Sửa / Xem tài khoản"
                         className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Pencil size={15} /></Link>
+                      <button onClick={() => handleReset(u.id, u.fullName)} title="Đặt lại mật khẩu"
+                        className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><KeyRound size={15} /></button>
                       <button onClick={() => handleToggle(u.id)} title={u.isActive ? "Ẩn học viên" : "Hiện lại"}
                         className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal">
                         {u.isActive ? <Lock size={15} /> : <Unlock size={15} />}
