@@ -24,6 +24,7 @@ export default function EditUserPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [testScore, setTestScore] = useState("");
   const [role, setRole] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [copied, setCopied] = useState(false);
@@ -38,6 +39,7 @@ export default function EditUserPage() {
           setEmail(data.data.email || "");
           setPhone(data.data.phone || "");
           setAddress(data.data.address || "");
+          setTestScore(data.data.testScore || "");
           setRole(data.data.role);
         }
       } catch {} finally { setLoading(false); }
@@ -48,7 +50,7 @@ export default function EditUserPage() {
   async function handleSave() {
     setSaving(true); setError(""); setSuccess("");
     try {
-      const body: any = { fullName, role, phone, address, email: email || null };
+      const body: any = { fullName, role, phone, address, email: email || null, testScore };
       if (newPassword) body.password = newPassword;
       const data = await api.put(`/users/${id}`, body);
       if (data.success) {
@@ -146,6 +148,14 @@ export default function EditUserPage() {
           <div>
             <label className="mb-1 block text-sm font-medium text-royal">Địa chỉ</label>
             <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Địa chỉ liên hệ" className="input-field" />
+          </div>
+        )}
+
+        {isStudent && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-royal">Điểm đầu vào</label>
+            <input value={testScore} onChange={(e) => setTestScore(e.target.value)} placeholder="VD: 6.5 hoặc Band 5.0" className="input-field" />
+            <p className="mt-1 text-xs text-muted">Nhập tay. Sau này khi HV làm test đầu vào trên hệ thống, điểm sẽ tự cập nhật vào đây.</p>
           </div>
         )}
 
