@@ -99,8 +99,10 @@ export default function ClassListPage() {
                   <td className="px-4 py-3 text-muted">{c.schedule || "—"}</td>
                   <td className="px-4 py-3 text-center font-bold text-royal">{c._count?.enrollments ?? 0}</td>
                   <td className="px-4 py-3">
-                    {c.status === "CLOSED"
-                      ? <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-bold text-gray-600">Đã đóng</span>
+                    {c.status === "FINISHED" || c.status === "CLOSED"
+                      ? <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-bold text-gray-600">Đã kết thúc</span>
+                      : c.status === "ENROLL_CLOSED"
+                      ? <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700">Hết hạn ĐK</span>
                       : <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-bold text-green-700">Đang học</span>}
                   </td>
                   <td className="px-4 py-3">
@@ -171,7 +173,8 @@ export default function ClassListPage() {
                 <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Trạng thái</label>
                 <select value={editing.status} onChange={(e) => setEditing({ ...editing, status: e.target.value })} className="input-field">
                   <option value="ACTIVE">Đang học</option>
-                  <option value="CLOSED">Đã đóng</option>
+                  <option value="ENROLL_CLOSED">Hết hạn đăng ký</option>
+                  <option value="FINISHED">Đã kết thúc</option>
                 </select>
               </div>
               <div className="md:col-span-2">
