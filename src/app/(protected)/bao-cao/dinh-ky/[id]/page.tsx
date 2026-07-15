@@ -15,6 +15,8 @@ export default function EditReportPage() {
   const [mode, setMode] = useState<"form" | "html">("form");
   const [studentName, setStudentName] = useState("");
   const [studentCode, setStudentCode] = useState("");
+  const [classes, setClasses] = useState<any[]>([]);
+  const [classId, setClassId] = useState("");
   const [course, setCourse] = useState("");
   const [learnclickUser, setLearnclickUser] = useState("");
   const [padletAccount, setPadletAccount] = useState("");
@@ -29,11 +31,13 @@ export default function EditReportPage() {
   const toDateInput = (d: string | null) => (d ? d.slice(0, 10) : "");
   useEffect(() => {
     (async () => {
-      const data = await api.get(`/reports/${id}`);
+      const [data, cl] = await Promise.all([api.get(`/reports/${id}`), api.get("/classes")]);
+      if (cl.success) setClasses(cl.data || []);
       if (data.success) {
         const r = data.data;
         setStudentName(r.student?.fullName || "");
         setStudentCode(r.student?.studentCode || "");
+        setClassId(r.classId || "");
         setCourse(r.course || "");
         setLearnclickUser(r.learnclickUser || "");
         setPadletAccount(r.padletAccount || "");
@@ -57,11 +61,19 @@ export default function EditReportPage() {
       setLoading(false);
     })();
   }, [id, router]);
+  // Đổi lớp → tự điền lại "Lớp / Khoá" theo lớp (giống trang tạo).
+  // KHÔNG đụng tới học sinh — báo cáo đã gắn HS rồi, đổi lớp không đổi người.
+  function onSelectClass(cid: string) {
+    setClassId(cid);
+    const c = classes.find((x) => x.id === cid);
+    if (c?.course) setCourse(c.course);
+  }
   async function handleSave(status: "DRAFT" | "PUBLISHED") {
     if (mode === "html" && !html.trim()) return alert("Vui lòng dán mã HTML của report");
     setSaving(true);
     const payload: any = {
       course, learnclickUser, padletAccount,
+      classId: classId || null,
       periodTo: periodTo || null, dataFrom: dataFrom || null, dataTo: dataTo || null,
       status,
     };
@@ -100,6 +112,13 @@ export default function EditReportPage() {
       <div className="card mb-6">
         <h3 className="mb-4 font-display text-lg font-bold text-royal">Thông tin chung</h3>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Lớp (tuỳ chọn)</label>
+            <select value={classId} onChange={(e) => onSelectClass(e.target.value)} className="input-field">
+              <option value="">— Không gắn lớp —</option>
+              {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
           <div>
             <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Lớp / Khoá</label>
             <input type="text" value={course} onChange={(e) => setCourse(e.target.value)} placeholder="7+" className="input-field" />
