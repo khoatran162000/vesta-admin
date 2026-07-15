@@ -1,9 +1,18 @@
 // FILE: src/app/(protected)/bai-tap/tao-moi/page.tsx — Chọn loại bài tập tương tác
 "use client";
 import Link from "next/link";
-import { ArrowLeft, TextCursorInput, ListChecks, ArrowLeftRight } from "lucide-react";
+import { ArrowLeft, TextCursorInput, ListChecks, ArrowLeftRight, ClipboardPaste } from "lucide-react";
 
 const TYPES = [
+  {
+    href: "/bai-tap/tao-moi/html",
+    icon: ClipboardPaste,
+    title: "Tạo từ HTML",
+    sub: "LearnClick import",
+    desc: "Dán HTML từ LearnClick (Edit HTML Source) — thẻ cloze tự thành chỗ trống. Giữ nguyên bảng, màu, video. Bôi đen + ⌘G để tạo thêm.",
+    color: "from-emerald-500/10 to-emerald-500/5 border-emerald-200",
+    ic: "bg-emerald-100 text-emerald-600",
+  },
   {
     href: "/bai-tap/tao-moi/gap",
     icon: TextCursorInput,
@@ -42,7 +51,7 @@ export default function ChooseExerciseTypePage() {
       <h2 className="mb-1 font-display text-2xl font-bold text-royal">Tạo bài tập tương tác</h2>
       <p className="mb-8 text-sm text-muted">Chọn loại bài tập bạn muốn tạo</p>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {TYPES.map((t) => (
           <Link key={t.href} href={t.href}
             className={`group rounded-2xl border bg-gradient-to-br ${t.color} p-5 transition-all hover:shadow-md`}>

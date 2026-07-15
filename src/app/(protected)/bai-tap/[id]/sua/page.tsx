@@ -7,6 +7,7 @@ import { ArrowLeft, Save, Loader2, Plus, Trash2, Check, ArrowLeftRight } from "l
 import { api } from "@/lib/api";
 import ExerciseMeta, { MetaState, emptyMeta } from "@/components/exercise/ExerciseMeta";
 import GapEditor, { GapData } from "@/components/exercise/GapEditor";
+import HtmlGapEditor from "@/components/exercise/HtmlGapEditor";
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
 const GAP_TYPES = ["CLOZE", "CLOZE_TEXT", "GAP"]; // các type coi là bài gap
@@ -87,6 +88,8 @@ export default function EditExercisePage() {
 
   const isGap = (gapData && Object.keys(gapData.gaps).length >= 0) && (GAP_TYPES.includes(type) || Object.keys(gapData.gaps).length > 0);
   const hasDrag = Object.values(gapData.gaps).some((g) => g.type === "DRAG");
+  // content có thẻ HTML → dùng editor HTML (TipTap sẽ nuốt mất bảng/màu/iframe)
+  const isHtmlGap = /<[a-z][\s\S]*>/i.test(gapInitial?.content || "");
 
   // ---- MC helpers ----
   function updateQ(idx: number, updater: (q: MCQuestion) => MCQuestion) {
@@ -175,8 +178,12 @@ export default function EditExercisePage() {
       {isGap && (
         <div className="card">
           <div className="mb-1 text-sm font-bold text-royal">Nội dung bài</div>
-          <p className="mb-3 text-xs text-muted">Bôi đen từ rồi bấm nút để tạo/sửa chỗ trống. Bấm vào chip để sửa đáp án.</p>
-          {gapInitial && <GapEditor initial={gapInitial} onChange={setGapData} />}
+          <p className="mb-3 text-xs text-muted">
+            {isHtmlGap ? "Bài HTML (LearnClick) — bôi đen rồi ⌘G để tạo chỗ trống. Bấm chip để sửa đáp án." : "Bôi đen từ rồi bấm nút để tạo/sửa chỗ trống. Bấm vào chip để sửa đáp án."}
+          </p>
+          {gapInitial && (isHtmlGap
+            ? <HtmlGapEditor initial={gapInitial} onChange={setGapData} />
+            : <GapEditor initial={gapInitial} onChange={setGapData} />)}
           <div className="mt-3 text-xs text-muted">Đang có <b>{Object.keys(gapData.gaps).length}</b> chỗ trống{hasDrag ? " · có kéo-thả" : ""}.</div>
           {hasDrag && (
             <div className="mt-4">
