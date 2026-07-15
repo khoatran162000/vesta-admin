@@ -142,7 +142,9 @@ export default function ClassContentPage() {
                   <td className="px-4 py-3 text-muted">{i + 1}</td>
                   <td className="px-4 py-3 font-medium text-[#1a1a2e]">{m.title}</td>
                   <td className="px-4 py-3"><span className="rounded bg-cream px-2 py-0.5 text-xs text-muted">{m.fileType || "FILE"}</span></td>
-                  <td className="px-4 py-3"><a href={m.fileUrl} target="_blank" className="text-xs text-gold underline">Mở link</a></td>
+                  <td className="px-4 py-3">{m.contentHtml
+                    ? <span className="rounded bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Bài HTML</span>
+                    : <a href={m.fileUrl} target="_blank" className="text-xs text-gold underline">Mở link</a>}</td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => { setEditItem(m); setShowModal(true); }} className="mr-1 rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><PenTool size={14} /></button>
                     <button onClick={() => handleDelete(m.id)} className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
@@ -197,15 +199,39 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
   const [form, setForm] = useState<any>(item || {});
   const [saving, setSaving] = useState(false);
   const [diaryMode, setDiaryMode] = useState<"form" | "html">(item?.contentHtml ? "html" : "form");
+  const [matMode, setMatMode] = useState<"link" | "html">(item?.contentHtml ? "html" : "link");
+  const [fbMode, setFbMode] = useState<"form" | "html">(item?.commentHtml ? "html" : "form");
   const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));
   async function handleSubmit() {
+    // Xoá hẳn field của mode không dùng (giống trang báo cáo) — tránh 2 nội dung cùng tồn tại
+    const payload: any = { ...form };
+    if (section === "materials") {
+      if (matMode === "html") {
+        if (!String(payload.contentHtml || "").trim()) return alert("Chưa dán mã HTML của tài liệu");
+        payload.fileUrl = "";
+        payload.fileType = "HTML";
+        } else {
+        if (!String(payload.fileUrl || "").trim()) return alert("Chưa nhập link tài liệu");
+        payload.contentHtml = null;
+      }
+    } else if (section === "feedback") {
+      if (fbMode === "html") {
+        payload.teacherComment = "";
+      } else {
+        payload.commentHtml = null;
+      }
+    }
     setSaving(true);
-    await onSave(form);
+    await onSave(payload);
     setSaving(false);
   }
+  const ModeBtn = ({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) => (
+    <button type="button" onClick={onClick}
+      className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${active ? "border-royal bg-royal text-white" : "border-silver/40 text-muted"}`}>{label}</button>
+  );
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 px-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-xl font-bold text-royal">
             {section === "diary" ? (item ? "Sửa buổi học" : "Thêm buổi học") :
@@ -217,10 +243,8 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
         <div className="space-y-3">
           {section === "diary" && (<>
             <div className="flex gap-2">
-              <button type="button" onClick={() => setDiaryMode("form")}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${diaryMode === "form" ? "border-royal bg-royal text-white" : "border-silver/40 text-muted"}`}>Nhập thường</button>
-              <button type="button" onClick={() => setDiaryMode("html")}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${diaryMode === "html" ? "border-royal bg-royal text-white" : "border-silver/40 text-muted"}`}>Dán HTML</button>
+              <ModeBtn active={diaryMode === "form"} onClick={() => setDiaryMode("form")} label="Nhập thường" />
+              <ModeBtn active={diaryMode === "html"} onClick={() => setDiaryMode("html")} label="Dán HTML" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -293,6 +317,10 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
             )}
           </>)}
           {section === "materials" && (<>
+            <div className="flex gap-2">
+              <ModeBtn active={matMode === "link"} onClick={() => setMatMode("link")} label="Link / File" />
+              <ModeBtn active={matMode === "html"} onClick={() => setMatMode("html")} label="Dán HTML" />
+            </div>
             <div>
               <label className="mb-1 block text-xs font-bold text-muted">Tên tài liệu</label>
               <input type="text" value={form.title || ""} onChange={(e) => set("title", e.target.value)} className="input-field" />
@@ -301,11 +329,11 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
               <label className="mb-1 block text-xs font-bold text-muted">Mô tả</label>
               <input type="text" value={form.description || ""} onChange={(e) => set("description", e.target.value)} className="input-field" />
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-muted">Link / URL</label>
-              <input type="url" value={form.fileUrl || ""} onChange={(e) => set("fileUrl", e.target.value)} placeholder="https://padlet.com/..." className="input-field" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+            {matMode === "link" ? (<>
+              <div>
+                <label className="mb-1 block text-xs font-bold text-muted">Link / URL</label>
+                <input type="url" value={form.fileUrl || ""} onChange={(e) => set("fileUrl", e.target.value)} placeholder="https://padlet.com/..." className="input-field" />
+              </div>
               <div>
                 <label className="mb-1 block text-xs font-bold text-muted">Loại</label>
                 <select value={form.fileType || ""} onChange={(e) => set("fileType", e.target.value)} className="input-field">
@@ -317,10 +345,17 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
                   <option value="DOC">Word</option>
                 </select>
               </div>
+            </>) : (
               <div>
-                <label className="mb-1 block text-xs font-bold text-muted">Thứ tự</label>
-                <input type="number" value={form.orderIndex || 0} onChange={(e) => set("orderIndex", parseInt(e.target.value))} className="input-field" />
+                <label className="mb-1 block text-xs font-bold text-muted">Mã HTML nội dung tài liệu</label>
+                <textarea value={form.contentHtml || ""} onChange={(e) => set("contentHtml", e.target.value)} rows={8}
+                  placeholder="<div>...</div>" className="input-field font-mono text-xs" />
+                <p className="mt-1 text-[0.7rem] text-muted">Học viên bấm vào tài liệu sẽ đọc HTML này ngay tại chỗ, không mở link ra ngoài.</p>
               </div>
+            )}
+            <div>
+              <label className="mb-1 block text-xs font-bold text-muted">Thứ tự</label>
+              <input type="number" value={form.orderIndex || 0} onChange={(e) => set("orderIndex", parseInt(e.target.value))} className="input-field" />
             </div>
           </>)}
           {section === "feedback" && (<>
@@ -334,10 +369,23 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
                 <div className="max-h-40 overflow-y-auto rounded-lg border border-silver/20 bg-cream p-3 text-sm text-[#1a1a2e] whitespace-pre-wrap">{item.studentWork}</div>
               </div>
             )}
-            <div>
-              <label className="mb-1 block text-xs font-bold text-muted">Nhận xét / Phản hồi</label>
-              <textarea value={form.teacherComment || ""} onChange={(e) => set("teacherComment", e.target.value)} rows={4} className="input-field" />
+            <div className="flex gap-2">
+              <ModeBtn active={fbMode === "form"} onClick={() => setFbMode("form")} label="Nhập thường" />
+              <ModeBtn active={fbMode === "html"} onClick={() => setFbMode("html")} label="Dán HTML" />
             </div>
+            {fbMode === "form" ? (
+              <div>
+                <label className="mb-1 block text-xs font-bold text-muted">Nhận xét / Phản hồi</label>
+                <textarea value={form.teacherComment || ""} onChange={(e) => set("teacherComment", e.target.value)} rows={4} className="input-field" />
+              </div>
+            ) : (
+              <div>
+                <label className="mb-1 block text-xs font-bold text-muted">Mã HTML nhận xét</label>
+                <textarea value={form.commentHtml || ""} onChange={(e) => set("commentHtml", e.target.value)} rows={8}
+                  placeholder="<div>...</div>" className="input-field font-mono text-xs" />
+                <p className="mt-1 text-[0.7rem] text-muted">Chỉ học viên này xem được nhận xét của mình.</p>
+              </div>
+            )}
             <div>
               <label className="mb-1 block text-xs font-bold text-muted">Điểm (0-10)</label>
               <input type="number" min="0" max="10" step="0.5" value={form.score ?? ""} onChange={(e) => set("score", parseFloat(e.target.value))} className="input-field" />
