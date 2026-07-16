@@ -108,7 +108,8 @@ export default function AttemptDetailPage() {
             </div>
 
             {/* Question content */}
-            <p className="mb-3 text-sm text-[#1a1a2e]" dangerouslySetInnerHTML={{ __html: q.content }} />
+            <div className="mb-3 overflow-x-auto text-sm text-[#1a1a2e] [&_table]:!w-full [&_table]:!max-w-full [&_td]:[overflow-wrap:anywhere] [&_img]:max-w-full [&_iframe]:max-w-full"
+              dangerouslySetInnerHTML={{ __html: q.content }} />
 
             {/* Options for MC */}
             {q.type === "MULTIPLE_CHOICE" && Array.isArray(q.options) && (
