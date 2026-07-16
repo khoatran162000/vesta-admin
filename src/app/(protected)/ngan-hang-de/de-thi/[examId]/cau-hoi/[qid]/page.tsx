@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Save, Plus, X, Loader2, ImagePlus, Headphones } from "lucide-react";
 import Link from "next/link";
 import { api, getImageUrl } from "@/lib/api";
+import QuestionContentEditor from "@/components/exam/QuestionContentEditor";
 
 export default function EditQuestionPage() {
   const params = useParams();
@@ -97,7 +98,7 @@ export default function EditQuestionPage() {
           <div><label className="mb-1 block text-sm font-medium text-royal">Điểm</label><input type="number" value={score} onChange={(e) => setScore(e.target.value)} className="input-field" step="0.5" /></div>
         </div>
 
-        <div className="card"><label className="mb-1 block text-sm font-medium text-royal">Nội dung câu hỏi *</label><textarea value={content} onChange={(e) => setContent(e.target.value)} rows={4} className="input-field" /></div>
+        <QuestionContentEditor value={content} onChange={setContent} />
 
         {/* Media */}
         <div className="card">

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Save, Plus, X, ImagePlus, Headphones } from "lucide-react";
 import Link from "next/link";
 import { api, getImageUrl } from "@/lib/api";
+import QuestionContentEditor from "@/components/exam/QuestionContentEditor";
 
 export default function CreateQuestionPage() {
   const params = useParams();
@@ -103,10 +104,7 @@ export default function CreateQuestionPage() {
         </div>
 
         {/* Content */}
-        <div className="card">
-          <label className="mb-1 block text-sm font-medium text-royal">Nội dung câu hỏi *</label>
-          <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={4} placeholder="Nhập nội dung câu hỏi..." className="input-field" />
-        </div>
+        <QuestionContentEditor value={content} onChange={setContent} />
 
         {/* Media upload (audio/image) */}
         <div className="card">
