@@ -178,7 +178,7 @@ export default function EditExercisePage() {
   );
 
   return (
-    <div className="mx-auto max-w-[800px]">
+    <div className={`mx-auto ${isHtmlGap ? "max-w-[1200px]" : "max-w-[800px]"}`}>
       <Link href="/bai-tap" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-royal"><ArrowLeft size={15} />Quay lại danh sách</Link>
       <h2 className="mb-6 font-display text-2xl font-bold text-royal">✏️ Sửa bài tập <span className="text-base font-normal text-muted">({type})</span></h2>
 

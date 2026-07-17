@@ -272,6 +272,13 @@ export default function HtmlGapEditor({ initial, onChange }: Props) {
       </div>
 
       {/* Vùng soạn — giữ nguyên HTML */}
+      <style>{`
+        /* HTML từ LearnClick fix cứng width="1300" → ép co vừa khung khi soạn, hết kéo ngang.
+           CHỈ là CSS hiển thị — nội dung lưu xuống DB vẫn giữ nguyên width gốc. */
+        .gap-edit-host table { width: 100% !important; max-width: 100% !important; }
+        .gap-edit-host td, .gap-edit-host th { overflow-wrap: anywhere; }
+        .gap-edit-host img, .gap-edit-host iframe, .gap-edit-host video { max-width: 100%; }
+      `}</style>
       <div className="overflow-x-auto rounded-lg border border-gray-300 focus-within:border-amber-400">
         <div
           ref={hostRef}
@@ -280,7 +287,7 @@ export default function HtmlGapEditor({ initial, onChange }: Props) {
           onInput={emit}
           onPaste={handlePaste}
           onClick={handleClick}
-          className="min-h-[220px] p-4 focus:outline-none"
+          className="gap-edit-host min-h-[220px] p-4 focus:outline-none"
         />
       </div>
       <p className="mt-2 text-xs text-gray-400">

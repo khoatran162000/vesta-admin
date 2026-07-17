@@ -53,7 +53,7 @@ export default function CreateHtmlGapPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[980px]">
+    <div className="mx-auto max-w-[1200px]">
       <Link href="/bai-tap/tao-moi" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-royal">
         <ArrowLeft size={15} />Chọn loại khác
       </Link>
