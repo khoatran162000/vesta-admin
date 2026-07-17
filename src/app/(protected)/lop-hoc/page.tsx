@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Save, Loader2, X, BookOpen, FileText, PenTool } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLevels } from "@/lib/useLevels";
+import HtmlPasteBox from "@/components/HtmlPasteBox";
 type Section = "diary" | "materials" | "feedback";
 
 // Parse bảng điểm dán từ Excel/Sheets: mỗi dòng 1 HS, cột tách bằng tab
@@ -231,7 +232,7 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
   );
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 px-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-xl font-bold text-royal">
             {section === "diary" ? (item ? "Sửa buổi học" : "Thêm buổi học") :
@@ -308,12 +309,12 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
                 )}
               </div>
             </>) : (
-              <div>
-                <label className="mb-1 block text-xs font-bold text-muted">Mã HTML nội dung buổi học</label>
-                <textarea value={form.contentHtml || ""} onChange={(e) => set("contentHtml", e.target.value)} rows={8}
-                  placeholder="<div>...</div>" className="input-field font-mono text-xs" />
-                <p className="mt-1 text-[0.7rem] text-muted">Học viên sẽ thấy đúng giao diện HTML này. Vẫn nên điền Buổi số + Ngày ở trên.</p>
-              </div>
+              <HtmlPasteBox
+                label="Mã HTML nội dung buổi học"
+                value={form.contentHtml || ""}
+                onChange={(v) => set("contentHtml", v)}
+                hint="Dán cả trang HTML (kể cả <!doctype>, <style>) cũng được — học viên thấy đúng giao diện này. Vẫn nên điền Buổi số + Ngày ở trên."
+              />
             )}
           </>)}
           {section === "materials" && (<>
@@ -346,12 +347,12 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
                 </select>
               </div>
             </>) : (
-              <div>
-                <label className="mb-1 block text-xs font-bold text-muted">Mã HTML nội dung tài liệu</label>
-                <textarea value={form.contentHtml || ""} onChange={(e) => set("contentHtml", e.target.value)} rows={8}
-                  placeholder="<div>...</div>" className="input-field font-mono text-xs" />
-                <p className="mt-1 text-[0.7rem] text-muted">Học viên bấm vào tài liệu sẽ đọc HTML này ngay tại chỗ, không mở link ra ngoài.</p>
-              </div>
+              <HtmlPasteBox
+                label="Mã HTML nội dung tài liệu"
+                value={form.contentHtml || ""}
+                onChange={(v) => set("contentHtml", v)}
+                hint="Học viên bấm vào tài liệu sẽ đọc HTML này ngay tại chỗ, không mở link ra ngoài."
+              />
             )}
             <div>
               <label className="mb-1 block text-xs font-bold text-muted">Thứ tự</label>
@@ -379,12 +380,12 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
                 <textarea value={form.teacherComment || ""} onChange={(e) => set("teacherComment", e.target.value)} rows={4} className="input-field" />
               </div>
             ) : (
-              <div>
-                <label className="mb-1 block text-xs font-bold text-muted">Mã HTML nhận xét</label>
-                <textarea value={form.commentHtml || ""} onChange={(e) => set("commentHtml", e.target.value)} rows={8}
-                  placeholder="<div>...</div>" className="input-field font-mono text-xs" />
-                <p className="mt-1 text-[0.7rem] text-muted">Chỉ học viên này xem được nhận xét của mình.</p>
-              </div>
+              <HtmlPasteBox
+                label="Mã HTML nhận xét"
+                value={form.commentHtml || ""}
+                onChange={(v) => set("commentHtml", v)}
+                hint="Chỉ học viên này xem được nhận xét của mình."
+              />
             )}
             <div>
               <label className="mb-1 block text-xs font-bold text-muted">Điểm (0-10)</label>
