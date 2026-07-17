@@ -7,6 +7,7 @@ import { ArrowLeft, Save, Loader2, Plus, Trash2, Check, ArrowLeftRight } from "l
 import { api } from "@/lib/api";
 import ExerciseMeta, { MetaState, emptyMeta } from "@/components/exercise/ExerciseMeta";
 import GapEditor, { GapData } from "@/components/exercise/GapEditor";
+import { useAuth } from "@/hooks/useAuth";
 import HtmlGapEditor from "@/components/exercise/HtmlGapEditor";
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
@@ -28,6 +29,7 @@ function metaFromExercise(ex: any): MetaState {
 export default function EditExercisePage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
+  const { user, loading: authLoading } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +49,13 @@ export default function EditExercisePage() {
   const [pairs, setPairs] = useState<Pair[]>([]);
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+
+  // GV gõ thẳng URL /sua → đá sang trang xem (backend cũng đã chặn PUT)
+  useEffect(() => {
+    if (!authLoading && user && user.role !== "ADMIN") {
+      router.replace(`/bai-tap/${id}/xem`);
+    }
+  }, [authLoading, user, id, router]);
 
   async function load() {
     setLoading(true);

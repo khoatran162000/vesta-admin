@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Plus, Trash2, Loader2, Eye, EyeOff, PenTool, BarChart3 } from "lucide-react";
 import { api } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
+import { canEditContent } from "@/lib/permissions";
 const VIS_LABELS: Record<string, { label: string; color: string }> = {
   PUBLIC: { label: "Công khai", color: "bg-green-50 text-green-700" },
   STUDENT: { label: "Học viên", color: "bg-blue-50 text-blue-700" },
@@ -11,6 +13,8 @@ const VIS_LABELS: Record<string, { label: string; color: string }> = {
   CLASS: { label: "Theo lớp", color: "bg-amber-50 text-amber-700" },
 };
 export default function ExerciseListPage() {
+  const { user } = useAuth();
+  const canEdit = canEditContent(user?.role);
   const [exercises, setExercises] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => { loadData(); }, []);
@@ -21,12 +25,14 @@ export default function ExerciseListPage() {
     setLoading(false);
   }
   async function togglePublish(ex: any) {
-    await api.put(`/interactive/${ex.id}`, { isPublished: !ex.isPublished });
+    const res = await api.put(`/interactive/${ex.id}`, { isPublished: !ex.isPublished });
+    if (!res.success) { alert(res.message || "Không có quyền thực hiện"); return; }
     loadData();
   }
   async function handleDelete(id: string) {
     if (!confirm("Xác nhận xoá bài tập này?")) return;
-    await api.delete(`/interactive/${id}`);
+    const res = await api.delete(`/interactive/${id}`);
+    if (!res.success) { alert(res.message || "Không có quyền thực hiện"); return; }
     loadData();
   }
   return (
@@ -36,15 +42,22 @@ export default function ExerciseListPage() {
           <h2 className="font-display text-2xl font-bold text-royal">🎯 Bài Tập Tương Tác</h2>
           <p className="mt-1 text-sm text-muted">{exercises.length} bài tập · Quiz, Fill blank, Matching, Vocab</p>
         </div>
-        <Link href="/bai-tap/tao-moi" className="btn-primary">
-          <Plus size={16} />Tạo bài tập
-        </Link>
+        {canEdit && (
+          <Link href="/bai-tap/tao-moi" className="btn-primary">
+            <Plus size={16} />Tạo bài tập
+          </Link>
+        )}
       </div>
+      {!canEdit && user && (
+        <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50/60 px-4 py-2.5 text-xs text-blue-800">
+          Bạn có quyền <b>xem bài tập + đáp án</b> và theo dõi kết quả học viên. Việc tạo/sửa nội dung do quản trị viên thực hiện.
+        </div>
+      )}
       <div className="overflow-hidden rounded-xl border border-silver/30 bg-white">
         {loading ? (
           <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-gold" /></div>
         ) : exercises.length === 0 ? (
-          <div className="py-16 text-center text-sm text-muted">Chưa có bài tập nào. Tạo bài đầu tiên!</div>
+          <div className="py-16 text-center text-sm text-muted">Chưa có bài tập nào.{canEdit ? " Tạo bài đầu tiên!" : ""}</div>
         ) : (
           <table className="w-full text-left text-sm">
             <thead><tr className="border-b bg-cream">
@@ -70,15 +83,28 @@ export default function ExerciseListPage() {
                       {ex.visibility === "CLASS" && ex.visibleTo && <span className="ml-1 text-xs text-muted">({ex.visibleTo})</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <button onClick={() => togglePublish(ex)}
-                        className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${ex.isPublished ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                        {ex.isPublished ? <><Eye size={11} />Đã đăng</> : <><EyeOff size={11} />Nháp</>}
-                      </button>
+                      {/* GV: badge chỉ để xem — PUT /interactive là ADMIN-only, bấm sẽ 403 */}
+                      {canEdit ? (
+                        <button onClick={() => togglePublish(ex)}
+                          className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${ex.isPublished ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                          {ex.isPublished ? <><Eye size={11} />Đã đăng</> : <><EyeOff size={11} />Nháp</>}
+                        </button>
+                      ) : (
+                        <span className={`flex w-fit items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${ex.isPublished ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                          {ex.isPublished ? <><Eye size={11} />Đã đăng</> : <><EyeOff size={11} />Nháp</>}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Link href={`/bai-tap/${ex.id}/thong-ke`} title="Thống kê" className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><BarChart3 size={14} /></Link>
-                      <Link href={`/bai-tap/${ex.id}/sua`} title="Sửa" className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><PenTool size={14} /></Link>
-                      <button onClick={() => handleDelete(ex.id)} title="Xoá" className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+                      {canEdit ? (
+                        <>
+                          <Link href={`/bai-tap/${ex.id}/sua`} title="Sửa" className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><PenTool size={14} /></Link>
+                          <button onClick={() => handleDelete(ex.id)} title="Xoá" className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+                        </>
+                      ) : (
+                        <Link href={`/bai-tap/${ex.id}/xem`} title="Xem bài + đáp án" className="inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Eye size={14} /></Link>
+                      )}
                     </td>
                   </tr>
                 );
