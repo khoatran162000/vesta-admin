@@ -6,8 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
 export default function EditExamPage() {
+  useRequireAdmin("/ngan-hang-de/de-thi");
   const params = useParams();
   const examId = params.examId as string;
   const router = useRouter();

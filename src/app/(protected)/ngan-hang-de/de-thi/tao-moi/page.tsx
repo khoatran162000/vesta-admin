@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
 export default function CreateExamPage() {
+  useRequireAdmin("/ngan-hang-de/de-thi");
   const router = useRouter();
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [title, setTitle] = useState(""); const [categoryId, setCategoryId] = useState("");

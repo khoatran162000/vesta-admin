@@ -7,8 +7,10 @@ import { ArrowLeft, Save, Plus, X, ImagePlus, Headphones } from "lucide-react";
 import Link from "next/link";
 import { api, getImageUrl } from "@/lib/api";
 import QuestionContentEditor from "@/components/exam/QuestionContentEditor";
+import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
 export default function CreateQuestionPage() {
+  useRequireAdmin("/ngan-hang-de/de-thi");
   const params = useParams();
   const examId = params.examId as string;
   const router = useRouter();
