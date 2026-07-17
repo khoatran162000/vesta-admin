@@ -8,43 +8,51 @@ import {
 } from "lucide-react";
 import { useAuth, ROLE_LABELS } from "@/hooks/useAuth";
 
-type NavLink = { href: string; label: string; icon: any };
-type NavGroup = { label: string; icon: any; children: { href: string; label: string }[] };
+// Nhóm quyền — khớp với backend (authorize ở routes). Đây CHỈ là lớp giao diện;
+// chặn thật nằm ở server, ẩn menu chỉ để GV không bấm vào chỗ 403.
+const ADMIN = ["ADMIN"];
+const STAFF = ["ADMIN", "TEACHER"];
+const CMS = ["ADMIN", "CONTENT_CREATOR"];   // giống cmsRoles bên post.routes
+
+type NavChild = { href: string; label: string; roles?: string[] };
+type NavLink = { href: string; label: string; icon: any; roles?: string[] };
+type NavGroup = { label: string; icon: any; children: NavChild[]; roles?: string[] };
 type NavItem = NavLink | NavGroup;
 
+// Không khai `roles` = mọi vai đăng nhập được admin portal đều thấy
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { label: "Tài khoản", icon: Users, children: [
-    { href: "/tai-khoan/giao-vien", label: "Giáo viên" },
-    { href: "/tai-khoan/marketing", label: "Marketing" },
-    { href: "/tai-khoan/hoc-vien", label: "Học viên" },
-    { href: "/tai-khoan/hoc-vien/tao-hang-loat", label: "Tạo HV hàng loạt" },
+    { href: "/tai-khoan/giao-vien", label: "Giáo viên", roles: ADMIN },
+    { href: "/tai-khoan/marketing", label: "Marketing", roles: ADMIN },
+    { href: "/tai-khoan/hoc-vien", label: "Học viên", roles: STAFF },
+    { href: "/tai-khoan/hoc-vien/tao-hang-loat", label: "Tạo HV hàng loạt", roles: ADMIN },
   ]},
-  { label: "Lớp học", icon: Calendar, children: [
+  { label: "Lớp học", icon: Calendar, roles: STAFF, children: [
     { href: "/lop-hoc-moi", label: "Quản lý lớp học" },
     { href: "/lop-hoc", label: "Nội dung lớp" },
     { href: "/lich-hoc", label: "Lịch học cả năm" },
-    { href: "/trinh-do", label: "Trình độ" },
+    { href: "/trinh-do", label: "Trình độ", roles: ADMIN },
   ]},
-  { label: "Ngân hàng đề", icon: BookOpen, children: [
-    { href: "/ngan-hang-de/categories", label: "Danh mục" },
+  { label: "Ngân hàng đề", icon: BookOpen, roles: STAFF, children: [
+    { href: "/ngan-hang-de/categories", label: "Danh mục", roles: ADMIN },
     { href: "/ngan-hang-de/de-thi", label: "Đề thi" },
   ]},
   { label: "Nội dung", icon: FileText, children: [
-    { href: "/bai-viet", label: "Bài viết Blog" },
-    { href: "/bai-tap", label: "Bài tập tương tác" },
-    { href: "/giao-vien", label: "Đội ngũ giáo viên" },
-    { href: "/khoa-hoc", label: "Khoá học" },
-    { href: "/sach", label: "Sách & Giáo trình" },
-    { href: "/noi-dung-trang-chu", label: "Nội dung trang chủ" },
+    { href: "/bai-viet", label: "Bài viết Blog", roles: CMS },
+    { href: "/bai-tap", label: "Bài tập tương tác", roles: STAFF },
+    { href: "/giao-vien", label: "Đội ngũ giáo viên", roles: ADMIN },
+    { href: "/khoa-hoc", label: "Khoá học", roles: ADMIN },
+    { href: "/sach", label: "Sách & Giáo trình", roles: ADMIN },
+    { href: "/noi-dung-trang-chu", label: "Nội dung trang chủ", roles: CMS },
   ]},
-  { href: "/theo-doi", label: "Theo dõi học viên", icon: GraduationCap },
-  { label: "Báo cáo", icon: BarChart3, children: [
+  { href: "/theo-doi", label: "Theo dõi học viên", icon: GraduationCap, roles: STAFF },
+  { label: "Báo cáo", icon: BarChart3, roles: STAFF, children: [
     { href: "/bao-cao", label: "Tổng hợp điểm" },
     { href: "/bao-cao/dinh-ky", label: "Báo cáo định kỳ" },
     { href: "/bao-cao/cuoi-khoa", label: "Báo cáo cuối khóa" },
   ] },
-  { href: "/thong-bao", label: "Thông báo", icon: Bell },
+  { href: "/thong-bao", label: "Thông báo", icon: Bell, roles: STAFF },
   { href: "/ho-so", label: "Hồ sơ", icon: UserCircle },
 ];
 
@@ -71,6 +79,17 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   }
   if (!user) return null;
 
+  // Lọc menu theo vai: bỏ mục không có quyền, bỏ luôn nhóm nếu rỗng
+  const can = (roles?: string[]) => !roles || roles.includes(user.role);
+  const navForRole: NavItem[] = NAV
+    .filter((item) => can(item.roles))
+    .map((item) => {
+      if ("href" in item) return item;
+      const group = item as NavGroup;
+      return { ...group, children: group.children.filter((c) => can(c.roles)) };
+    })
+    .filter((item) => "href" in item || (item as NavGroup).children.length > 0);
+
   return (
     <div className="flex min-h-screen bg-cream">
       <aside className="sticky top-0 flex h-screen w-[240px] shrink-0 flex-col border-r border-silver/30 bg-white">
@@ -88,7 +107,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
-          {NAV.map((item) => {
+          {navForRole.map((item) => {
             if ("href" in item) {
               const link = item as NavLink;
               const active = pathname === link.href || pathname.startsWith(link.href + "/");
