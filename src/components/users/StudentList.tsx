@@ -5,12 +5,14 @@ import Link from "next/link";
 import { Plus, Search, Lock, Unlock, Pencil, Loader2, Upload, FileDown, LineChart, KeyRound, Eye, EyeOff, Users, Trash2, X, GraduationCap } from "lucide-react";
 import * as XLSX from "xlsx";
 import { api } from "@/lib/api";
+import { useLevels } from "@/lib/useLevels";
 interface Student {
   id: string; email: string | null; studentCode: string | null; fullName: string;
   phone: string | null; address: string | null; course: string | null;
   testScore: string | null; isActive: boolean; regStatus: string | null; createdAt: string;
 }
 export function StudentList() {
+  const COURSES = useLevels();
   const [users, setUsers] = useState<Student[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -28,6 +30,8 @@ export function StudentList() {
   const [newAddress, setNewAddress] = useState("");
   const [newPass, setNewPass] = useState("");
   const [newCode, setNewCode] = useState("");
+  const [newCourse, setNewCourse] = useState("");
+  const [newStartDate, setNewStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [creating, setCreating] = useState(false);
   const [msg, setMsg] = useState("");
   const fetchUsers = useCallback(async () => {
@@ -95,17 +99,20 @@ export function StudentList() {
     e.preventDefault(); setCreating(true); setMsg("");
     try {
       const body: any = { fullName: newName, role: "STUDENT" };
-      if (newCode) body.studentCode = newCode;
+      if (newCode) body.studentCode = newCode;            // để trống = tự sinh theo công thức
       if (newEmail) body.email = newEmail;
-      body.phone = newPhone || undefined;
+      body.phone = newPhone || undefined;                 // mật khẩu = SĐT (backend tự xử)
       body.address = newAddress || undefined;
-      body.password = newPass || "Student@123";
+      body.course = newCourse || undefined;
+      body.startDate = newStartDate || undefined;
+      if (newPass) body.password = newPass;               // chỉ gửi khi admin nhập tay
       const data = await api.post("/users", body);
       if (data.success) {
         setShowCreate(false);
         setNewName(""); setNewEmail(""); setNewPhone(""); setNewAddress(""); setNewPass(""); setNewCode("");
+        setNewCourse(""); setNewStartDate(new Date().toISOString().slice(0, 10));
         fetchUsers();
-        if (data.data?.studentCode) alert(`Tạo thành công! Mã học viên: ${data.data.studentCode}`);
+        if (data.data?.studentCode) alert(`Tạo thành công!\nMã HV: ${data.data.studentCode}\nMật khẩu: ${data.data.password || "(SĐT)"}`);
       } else { setMsg(data.message); }
     } catch { setMsg("Lỗi server"); } finally { setCreating(false); }
   }
@@ -259,12 +266,25 @@ export function StudentList() {
             <h3 className="font-display text-xl font-bold text-royal">Tạo Học viên</h3>
             {msg && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{msg}</p>}
             <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Họ và tên *" required className="input-field" />
-            <input type="text" value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="Mã học viên (để trống = tự tạo)" className="input-field" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-bold text-muted">Lớp *</label>
+                <select value={newCourse} onChange={(e) => setNewCourse(e.target.value)} required className="input-field">
+                  <option value="">— Chọn lớp —</option>
+                  {COURSES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-bold text-muted">Ngày đăng ký *</label>
+                <input type="date" value={newStartDate} onChange={(e) => setNewStartDate(e.target.value)} required className="input-field" />
+              </div>
+            </div>
+            <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="Số điện thoại (= mật khẩu đăng nhập)" className="input-field" />
             <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="Email (tuỳ chọn)" className="input-field" />
-            <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="Số điện thoại" className="input-field" />
-            <input type="text" value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Địa chỉ" className="input-field" />
-            <input type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="Mật khẩu (mặc định: Student@123)" className="input-field" />
-            <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">Học viên đăng nhập bằng <strong>Mã HV + Mật khẩu</strong>. Mã HV tự tạo nếu để trống.</p>
+            <input type="text" value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Địa chỉ (tuỳ chọn)" className="input-field" />
+            <input type="text" value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="Mã HV (để trống = tự sinh theo tên+lớp+ngày)" className="input-field" />
+            <input type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="Mật khẩu (để trống = dùng SĐT)" className="input-field" />
+            <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">Mã HV tự sinh theo <strong>tên + lớp + ngày đăng ký</strong> (vd <code>lehuongly7+170726</code>). Mật khẩu mặc định là <strong>SĐT</strong>. HS đăng nhập bằng Mã HV + mật khẩu.</p>
             <div className="flex justify-end gap-3">
               <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary">Huỷ</button>
               <button type="submit" disabled={creating} className="btn-primary">{creating ? "Đang tạo..." : "Tạo"}</button>
