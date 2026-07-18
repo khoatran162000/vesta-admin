@@ -1,14 +1,14 @@
-// FILE: src/components/users/StudentList.tsx — Quản lý học viên (điểm đầu vào / Excel / theo dõi / quản lý lớp / chọn lô)
+// FILE: src/components/users/StudentList.tsx — Quản lý học viên (điểm đầu vào / Excel / theo dõi / quản lý lớp / chọn lô / ghi danh)
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Search, Lock, Unlock, Pencil, Loader2, Upload, FileDown, LineChart, KeyRound, Eye, EyeOff, Users, Trash2, X } from "lucide-react";
+import { Plus, Search, Lock, Unlock, Pencil, Loader2, Upload, FileDown, LineChart, KeyRound, Eye, EyeOff, Users, Trash2, X, GraduationCap } from "lucide-react";
 import * as XLSX from "xlsx";
 import { api } from "@/lib/api";
 interface Student {
   id: string; email: string | null; studentCode: string | null; fullName: string;
   phone: string | null; address: string | null; course: string | null;
-  testScore: string | null; isActive: boolean; createdAt: string;
+  testScore: string | null; isActive: boolean; regStatus: string | null; createdAt: string;
 }
 export function StudentList() {
   const [users, setUsers] = useState<Student[]>([]);
@@ -76,6 +76,21 @@ export function StudentList() {
       alert(data.message || "Lỗi đặt lại mật khẩu");
     }
   }
+  // ── Ghi danh: mở khoá phần học cho HS (isPaid = regStatus CONFIRMED|PAID) ──
+  const isEnrolled = (s: Student) => s.regStatus === "CONFIRMED" || s.regStatus === "PAID";
+  async function bulkEnroll() {
+    const ids = [...selected];
+    if (!confirm(`Đánh dấu ${ids.length} học viên là "Đã ghi danh"? Học viên sẽ mở được đầy đủ phần học (nhật ký, tài liệu, bài tập...).`)) return;
+    const res = await api.patch("/users/bulk-reg-status", { ids, regStatus: "CONFIRMED" });
+    if (res.success) { setSelected(new Set()); fetchUsers(); alert(res.message || "Đã cập nhật"); }
+    else alert(res.message || "Lỗi cập nhật");
+  }
+  async function toggleEnroll(u: Student) {
+    const next = isEnrolled(u) ? "TEST" : "CONFIRMED";
+    const res = await api.patch("/users/bulk-reg-status", { ids: [u.id], regStatus: next });
+    if (res.success) fetchUsers();
+    else alert(res.message || "Lỗi cập nhật");
+  }
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault(); setCreating(true); setMsg("");
     try {
@@ -118,6 +133,7 @@ export function StudentList() {
       "Khoá": u.course || "",
       "Điểm đầu vào": u.testScore || "",
       "Trạng thái": u.isActive ? "Hoạt động" : "Đã ẩn",
+      "Ghi danh": isEnrolled(u) ? "Đã ghi danh" : "Chưa ghi danh",
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -149,7 +165,8 @@ export function StudentList() {
         <div className="mb-4 flex items-center justify-between rounded-xl border border-gold/30 bg-gold/5 px-4 py-3">
           <span className="text-sm font-medium text-royal">Đã chọn {selected.size} học viên</span>
           <div className="flex gap-2">
-            <button onClick={() => setBulkModal(true)} className="btn-primary"><Users size={14} />Thêm vào lớp</button>
+            <button onClick={bulkEnroll} className="btn-primary"><GraduationCap size={14} />Đánh dấu đã ghi danh</button>
+            <button onClick={() => setBulkModal(true)} className="btn-secondary"><Users size={14} />Thêm vào lớp</button>
             <button onClick={() => setSelected(new Set())} className="btn-secondary">Bỏ chọn</button>
           </div>
         </div>
@@ -193,9 +210,14 @@ export function StudentList() {
                       : <span className="text-muted">—</span>}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${u.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
-                      {u.isActive ? "Hoạt động" : "Đã ẩn"}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className={`w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold ${u.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+                        {u.isActive ? "Hoạt động" : "Đã ẩn"}
+                      </span>
+                      <span className={`w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold ${isEnrolled(u) ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"}`}>
+                        {isEnrolled(u) ? "Đã ghi danh" : "Chưa ghi danh"}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -207,6 +229,10 @@ export function StudentList() {
                         className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><KeyRound size={15} /></button>
                       <button onClick={() => setClassModal(u)} title="Quản lý lớp"
                         className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Users size={15} /></button>
+                      <button onClick={() => toggleEnroll(u)} title={isEnrolled(u) ? "Bỏ ghi danh (khoá phần học)" : "Đánh dấu đã ghi danh (mở phần học)"}
+                        className={`rounded-lg p-1.5 hover:bg-cream-dark ${isEnrolled(u) ? "text-blue-500" : "text-amber-500"}`}>
+                        <GraduationCap size={15} />
+                      </button>
                       <button onClick={() => handleToggle(u.id)} title={u.isActive ? "Ẩn học viên" : "Hiện lại"}
                         className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal">
                         {u.isActive ? <Lock size={15} /> : <Unlock size={15} />}
