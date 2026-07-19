@@ -26,7 +26,6 @@ const NAV: NavItem[] = [
     { href: "/tai-khoan/giao-vien", label: "Giáo viên", roles: ADMIN },
     { href: "/tai-khoan/marketing", label: "Marketing", roles: ADMIN },
     { href: "/tai-khoan/hoc-vien", label: "Học viên", roles: STAFF },
-    { href: "/tai-khoan/hoc-vien/tao-hang-loat", label: "Tạo HV hàng loạt", roles: ADMIN },
   ]},
   { label: "Lớp học", icon: Calendar, roles: STAFF, children: [
     { href: "/lop-hoc-moi", label: "Quản lý lớp học" },

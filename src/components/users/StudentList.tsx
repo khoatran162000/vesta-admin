@@ -1,4 +1,4 @@
-// FILE: src/components/users/StudentList.tsx — Quản lý học viên (điểm đầu vào / Excel / theo dõi / quản lý lớp / chọn lô / ghi danh)
+// FILE: src/components/users/StudentList.tsx — Quản lý học viên (ghi danh / xoá hẳn / chuyển lớp bulk)
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -49,7 +49,6 @@ export function StudentList() {
     const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 400);
     return () => clearTimeout(t);
   }, [searchInput]);
-  // Đổi trang/tìm kiếm/toggle ẩn → xoá lựa chọn (tránh chọn lô cross-page nhầm)
   useEffect(() => { setSelected(new Set()); }, [page, search, includeHidden]);
   function toggleOne(id: string) {
     setSelected((prev) => {
@@ -80,7 +79,25 @@ export function StudentList() {
       alert(data.message || "Lỗi đặt lại mật khẩu");
     }
   }
-  // ── Ghi danh: mở khoá phần học cho HS (isPaid = regStatus CONFIRMED|PAID) ──
+  // ── Xoá VĨNH VIỄN 1 HS — backend chặn nếu HS đã có dữ liệu học ──
+  async function handleDeleteHard(u: Student) {
+    if (!confirm(`XOÁ VĨNH VIỄN học viên "${u.fullName}" (${u.studentCode})?\n\nHành động này KHÔNG hoàn tác được. Nếu HS đã có dữ liệu học, hệ thống sẽ chặn và bạn nên dùng "Ẩn" thay thế.`)) return;
+    const res = await api.delete(`/users/${u.id}/hard`);
+    if (res.success) { fetchUsers(); alert(res.message || "Đã xoá"); }
+    else alert(res.message || "Không thể xoá");
+  }
+  async function bulkDelete() {
+    const ids = [...selected];
+    if (!confirm(`XOÁ VĨNH VIỄN ${ids.length} học viên đang chọn?\n\nKhông hoàn tác. HS đã có dữ liệu học sẽ được tự động bỏ qua (không xoá).`)) return;
+    const res = await api.post("/users/bulk-delete", { ids });
+    if (res.success) {
+      setSelected(new Set()); fetchUsers();
+      let m = res.message || "Đã xoá";
+      if (res.data?.skippedNames?.length) m += `\n\nBỏ qua (đã có dữ liệu học): ${res.data.skippedNames.join(", ")}`;
+      alert(m);
+    } else alert(res.message || "Lỗi xoá");
+  }
+  // ── Ghi danh ──
   const isEnrolled = (s: Student) => s.regStatus === "CONFIRMED" || s.regStatus === "PAID";
   async function bulkEnroll() {
     const ids = [...selected];
@@ -99,13 +116,13 @@ export function StudentList() {
     e.preventDefault(); setCreating(true); setMsg("");
     try {
       const body: any = { fullName: newName, role: "STUDENT" };
-      if (newCode) body.studentCode = newCode;            // để trống = tự sinh theo công thức
+      if (newCode) body.studentCode = newCode;
       if (newEmail) body.email = newEmail;
-      body.phone = newPhone || undefined;                 // mật khẩu = SĐT (backend tự xử)
+      body.phone = newPhone || undefined;
       body.address = newAddress || undefined;
       body.course = newCourse || undefined;
       body.startDate = newStartDate || undefined;
-      if (newPass) body.password = newPass;               // chỉ gửi khi admin nhập tay
+      if (newPass) body.password = newPass;
       const data = await api.post("/users", body);
       if (data.success) {
         setShowCreate(false);
@@ -116,7 +133,6 @@ export function StudentList() {
       } else { setMsg(data.message); }
     } catch { setMsg("Lỗi server"); } finally { setCreating(false); }
   }
-  // Xuất Excel: lấy TẤT CẢ học viên (không phân trang) rồi xuất .xlsx
   async function exportExcel() {
     let all: Student[] = [];
     let p = 1;
@@ -129,7 +145,7 @@ export function StudentList() {
       all = all.concat(data.data);
       if (data.data.length < 50) break;
       p++;
-      if (p > 50) break; // chặn vòng lặp vô hạn
+      if (p > 50) break;
     }
     const rows = all.map((u) => ({
       "Mã HV": u.studentCode || "",
@@ -171,9 +187,10 @@ export function StudentList() {
       {selected.size > 0 && (
         <div className="mb-4 flex items-center justify-between rounded-xl border border-gold/30 bg-gold/5 px-4 py-3">
           <span className="text-sm font-medium text-royal">Đã chọn {selected.size} học viên</span>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button onClick={bulkEnroll} className="btn-primary"><GraduationCap size={14} />Đánh dấu đã ghi danh</button>
-            <button onClick={() => setBulkModal(true)} className="btn-secondary"><Users size={14} />Thêm vào lớp</button>
+            <button onClick={() => setBulkModal(true)} className="btn-secondary"><Users size={14} />Chuyển / Thêm vào lớp</button>
+            <button onClick={bulkDelete} className="btn-secondary !text-red-600 hover:!bg-red-50"><Trash2 size={14} />Xoá hẳn</button>
             <button onClick={() => setSelected(new Set())} className="btn-secondary">Bỏ chọn</button>
           </div>
         </div>
@@ -244,6 +261,8 @@ export function StudentList() {
                         className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal">
                         {u.isActive ? <Lock size={15} /> : <Unlock size={15} />}
                       </button>
+                      <button onClick={() => handleDeleteHard(u)} title="Xoá vĩnh viễn (chỉ khi HS chưa có dữ liệu học)"
+                        className="rounded-lg p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={15} /></button>
                     </div>
                   </td>
                 </tr>
@@ -262,10 +281,10 @@ export function StudentList() {
       )}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 px-4">
-          <form onSubmit={handleCreate} className="w-full max-w-lg card space-y-4">
+          <form onSubmit={handleCreate} autoComplete="off" className="w-full max-w-lg card space-y-4">
             <h3 className="font-display text-xl font-bold text-royal">Tạo Học viên</h3>
             {msg && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{msg}</p>}
-            <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Họ và tên *" required className="input-field" />
+            <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Họ và tên *" required autoComplete="off" className="input-field" />
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-xs font-bold text-muted">Lớp *</label>
@@ -279,11 +298,11 @@ export function StudentList() {
                 <input type="date" value={newStartDate} onChange={(e) => setNewStartDate(e.target.value)} required className="input-field" />
               </div>
             </div>
-            <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="Số điện thoại (= mật khẩu đăng nhập)" className="input-field" />
-            <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="Email (tuỳ chọn)" className="input-field" />
-            <input type="text" value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Địa chỉ (tuỳ chọn)" className="input-field" />
-            <input type="text" value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="Mã HV (để trống = tự sinh theo tên+lớp+ngày)" className="input-field" />
-            <input type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="Mật khẩu (để trống = dùng SĐT)" className="input-field" />
+            <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="Số điện thoại (= mật khẩu đăng nhập)" autoComplete="off" className="input-field" />
+            <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="Email (tuỳ chọn)" autoComplete="off" className="input-field" />
+            <input type="text" value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Địa chỉ (tuỳ chọn)" autoComplete="off" className="input-field" />
+            <input type="text" value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="Mã HV (để trống = tự sinh theo tên+lớp+ngày)" autoComplete="off" className="input-field" />
+            <input type="text" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="Mật khẩu (để trống = dùng SĐT)" autoComplete="off" className="input-field" />
             <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">Mã HV tự sinh theo <strong>tên + lớp + ngày đăng ký</strong> (vd <code>lehuongly7+170726</code>). Mật khẩu mặc định là <strong>SĐT</strong>. HS đăng nhập bằng Mã HV + mật khẩu.</p>
             <div className="flex justify-end gap-3">
               <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary">Huỷ</button>
@@ -299,7 +318,7 @@ export function StudentList() {
         <BulkAddClassModal
           studentIds={[...selected]}
           onClose={() => setBulkModal(false)}
-          onDone={() => { setBulkModal(false); setSelected(new Set()); alert("Đã thêm học viên vào lớp"); }}
+          onDone={() => { setBulkModal(false); setSelected(new Set()); alert("Đã xử lý xong"); }}
         />
       )}
     </div>

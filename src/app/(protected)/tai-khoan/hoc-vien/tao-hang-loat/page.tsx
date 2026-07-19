@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Users, Loader2, CheckCircle, Copy, Download } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLevels } from "@/lib/useLevels";
+import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 interface Account {
   fullName: string;
   studentCode: string;
@@ -12,6 +13,7 @@ interface Account {
   phone: string;
 }
 export default function BatchCreatePage() {
+  useRequireAdmin("/tai-khoan/hoc-vien");
   const COURSES = useLevels();
   const [input, setInput] = useState("");
   const [course, setCourse] = useState("6+");
