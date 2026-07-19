@@ -9,8 +9,18 @@ import { api } from "@/lib/api";
 const ENROLL_STATUS: Record<string, { label: string; cls: string }> = {
   STUDYING: { label: "Đang học", cls: "bg-green-50 text-green-700" },
   COMPLETED: { label: "Hoàn thành", cls: "bg-blue-50 text-blue-700" },
-  LEFT: { label: "Đã nghỉ", cls: "bg-gray-100 text-gray-600" },
+  TESTED: { label: "Đã thi", cls: "bg-purple-50 text-purple-700" },
+  RESERVED: { label: "Bảo lưu", cls: "bg-amber-50 text-amber-700" },
+  LEFT: { label: "Đã nghỉ", cls: "bg-gray-100 text-gray-600" }, // giữ để HS cũ không hiện trống
 };
+
+// Các trạng thái cho chọn ở dropdown (LEFT đã bỏ khỏi lựa chọn mới theo yêu cầu)
+const STATUS_OPTIONS = [
+  { value: "STUDYING", label: "Đang học" },
+  { value: "COMPLETED", label: "Hoàn thành" },
+  { value: "TESTED", label: "Đã thi" },
+  { value: "RESERVED", label: "Bảo lưu" },
+];
 
 export default function ClassDetailPage() {
   const { id } = useParams();
@@ -119,10 +129,12 @@ export default function ClassDetailPage() {
                   <td className="px-4 py-3 font-mono text-xs text-royal">{e.student.studentCode || "—"}</td>
                   <td className="px-4 py-3">
                     <select value={e.status} onChange={(ev) => setStatus(e.student.id, ev.target.value)}
-                      className={`rounded-full border-0 px-2.5 py-0.5 text-xs font-bold outline-none ${ENROLL_STATUS[e.status]?.cls || ""}`}>
-                      <option value="STUDYING">Đang học</option>
-                      <option value="COMPLETED">Hoàn thành</option>
-                      <option value="LEFT">Đã nghỉ</option>
+                      className={`rounded-full border-0 px-2.5 py-0.5 text-xs font-bold outline-none ${ENROLL_STATUS[e.status]?.cls || "bg-gray-100 text-gray-600"}`}>
+                      {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      {/* Nếu HS đang mang trạng thái cũ (LEFT) không có trong options → hiện thêm để không mất */}
+                      {!STATUS_OPTIONS.some((o) => o.value === e.status) && (
+                        <option value={e.status}>{ENROLL_STATUS[e.status]?.label || e.status}</option>
+                      )}
                     </select>
                   </td>
                   <td className="px-4 py-3 text-right">
