@@ -1,8 +1,8 @@
-// FILE: src/components/users/StudentList.tsx — Quản lý học viên (ghi danh / xoá hẳn / chuyển lớp bulk)
+// FILE: src/components/users/StudentList.tsx — Quản lý học viên (ghi danh / xoá hẳn / chuyển lớp / cờ học tập)
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Search, Lock, Unlock, Pencil, Loader2, Upload, FileDown, LineChart, KeyRound, Eye, EyeOff, Users, Trash2, X, GraduationCap } from "lucide-react";
+import { Plus, Search, Lock, Unlock, Pencil, Loader2, Upload, FileDown, LineChart, KeyRound, Eye, EyeOff, Users, Trash2, X, GraduationCap, ShieldAlert } from "lucide-react";
 import * as XLSX from "xlsx";
 import { api } from "@/lib/api";
 import { useLevels } from "@/lib/useLevels";
@@ -10,6 +10,7 @@ interface Student {
   id: string; email: string | null; studentCode: string | null; fullName: string;
   phone: string | null; address: string | null; course: string | null;
   testScore: string | null; isActive: boolean; regStatus: string | null; createdAt: string;
+  studyFlag?: boolean; lockedAt?: string | null;
 }
 export function StudentList() {
   const COURSES = useLevels();
@@ -112,6 +113,14 @@ export function StudentList() {
     if (res.success) fetchUsers();
     else alert(res.message || "Lỗi cập nhật");
   }
+  // ── Mở khoá / gỡ cờ học tập (cron cắm) ──
+  async function handleUnlock(u: Student) {
+    const what = u.lockedAt ? "mở khoá" : "gỡ cờ";
+    if (!confirm(`Xác nhận ${what} cho "${u.fullName}"? Học viên sẽ trở lại trạng thái bình thường.`)) return;
+    const res = await api.patch(`/users/${u.id}/unlock`);
+    if (res.success) { fetchUsers(); }
+    else alert(res.message || "Lỗi mở khoá");
+  }
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault(); setCreating(true); setMsg("");
     try {
@@ -157,6 +166,7 @@ export function StudentList() {
       "Điểm đầu vào": u.testScore || "",
       "Trạng thái": u.isActive ? "Hoạt động" : "Đã ẩn",
       "Ghi danh": isEnrolled(u) ? "Đã ghi danh" : "Chưa ghi danh",
+      "Học tập": u.lockedAt ? "Tạm khoá" : u.studyFlag ? "Chưa đủ bài" : "Bình thường",
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -241,6 +251,11 @@ export function StudentList() {
                       <span className={`w-fit rounded-full px-2.5 py-0.5 text-xs font-semibold ${isEnrolled(u) ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"}`}>
                         {isEnrolled(u) ? "Đã ghi danh" : "Chưa ghi danh"}
                       </span>
+                      {u.lockedAt ? (
+                        <span className="w-fit rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">🔒 Tạm khoá</span>
+                      ) : u.studyFlag ? (
+                        <span className="w-fit rounded-full bg-orange-50 px-2.5 py-0.5 text-xs font-semibold text-orange-600">🚩 Chưa đủ bài</span>
+                      ) : null}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -257,6 +272,10 @@ export function StudentList() {
                         className={`rounded-lg p-1.5 hover:bg-cream-dark ${isEnrolled(u) ? "text-blue-500" : "text-amber-500"}`}>
                         <GraduationCap size={15} />
                       </button>
+                      {(u.studyFlag || u.lockedAt) && (
+                        <button onClick={() => handleUnlock(u)} title="Mở khoá / gỡ cờ học tập"
+                          className="rounded-lg p-1.5 text-green-600 hover:bg-green-50"><ShieldAlert size={15} /></button>
+                      )}
                       <button onClick={() => handleToggle(u.id)} title={u.isActive ? "Ẩn học viên" : "Hiện lại"}
                         className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal">
                         {u.isActive ? <Lock size={15} /> : <Unlock size={15} />}
