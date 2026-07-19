@@ -174,7 +174,7 @@ export function StudentList() {
     XLSX.writeFile(wb, `hoc-vien-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
   return (
-    <div className="mx-auto max-w-[1200px]">
+    <div className="mx-auto max-w-[1340px]">
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h2 className="font-display text-2xl font-bold text-royal">Quản lý Học viên</h2>
@@ -205,7 +205,7 @@ export function StudentList() {
           </div>
         </div>
       )}
-      <div className="card overflow-hidden !p-0">
+      <div className="card overflow-x-auto !p-0">
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 size={22} className="animate-spin text-gold" /></div>
         ) : (
@@ -259,7 +259,7 @@ export function StudentList() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="flex items-center justify-end gap-0.5 whitespace-nowrap">
                       <Link href={`/theo-doi/${u.id}`} title="Xem điểm & quá trình làm bài"
                         className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><LineChart size={15} /></Link>
                       <Link href={`/tai-khoan/${u.id}`} title="Sửa / Xem tài khoản"
