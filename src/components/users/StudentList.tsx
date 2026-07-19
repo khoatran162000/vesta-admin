@@ -1,4 +1,4 @@
-// FILE: src/components/users/StudentList.tsx — Quản lý học viên (ghi danh / xoá hẳn / chuyển lớp / cờ học tập)
+// FILE: src/components/users/StudentList.tsx — Quản lý học viên (ghi danh / xoá hẳn / chuyển lớp / cờ học tập / xếp lớp khi tạo)
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
@@ -33,6 +33,8 @@ export function StudentList() {
   const [newCode, setNewCode] = useState("");
   const [newCourse, setNewCourse] = useState("");
   const [newStartDate, setNewStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [newClassId, setNewClassId] = useState("");
+  const [classes, setClasses] = useState<any[]>([]);
   const [creating, setCreating] = useState(false);
   const [msg, setMsg] = useState("");
   const fetchUsers = useCallback(async () => {
@@ -51,6 +53,12 @@ export function StudentList() {
     return () => clearTimeout(t);
   }, [searchInput]);
   useEffect(() => { setSelected(new Set()); }, [page, search, includeHidden]);
+  // Nạp danh sách lớp khi mở form tạo HV (để chọn xếp lớp luôn)
+  useEffect(() => {
+    if (showCreate && classes.length === 0) {
+      api.get("/classes").then((r) => { if (r.success) setClasses(r.data || []); });
+    }
+  }, [showCreate, classes.length]);
   function toggleOne(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -134,11 +142,17 @@ export function StudentList() {
       if (newPass) body.password = newPass;
       const data = await api.post("/users", body);
       if (data.success) {
+        // Nếu có chọn lớp học → ghi danh luôn (không cần vào modal ghi danh riêng)
+        let enrollNote = "";
+        if (newClassId && data.data?.id) {
+          const er = await api.post(`/classes/${newClassId}/enroll`, { studentIds: [data.data.id] });
+          enrollNote = er.success ? "\nĐã xếp vào lớp học." : "\n(Lưu ý: tạo HV xong nhưng chưa xếp được vào lớp)";
+        }
         setShowCreate(false);
         setNewName(""); setNewEmail(""); setNewPhone(""); setNewAddress(""); setNewPass(""); setNewCode("");
-        setNewCourse(""); setNewStartDate(new Date().toISOString().slice(0, 10));
+        setNewCourse(""); setNewStartDate(new Date().toISOString().slice(0, 10)); setNewClassId("");
         fetchUsers();
-        if (data.data?.studentCode) alert(`Tạo thành công!\nMã HV: ${data.data.studentCode}\nMật khẩu: ${data.data.password || "(SĐT)"}`);
+        if (data.data?.studentCode) alert(`Tạo thành công!\nMã HV: ${data.data.studentCode}\nMật khẩu: ${data.data.password || "(SĐT)"}${enrollNote}`);
       } else { setMsg(data.message); }
     } catch { setMsg("Lỗi server"); } finally { setCreating(false); }
   }
@@ -306,9 +320,9 @@ export function StudentList() {
             <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Họ và tên *" required autoComplete="off" className="input-field" />
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-xs font-bold text-muted">Lớp *</label>
-                <select value={newCourse} onChange={(e) => setNewCourse(e.target.value)} required className="input-field">
-                  <option value="">— Chọn lớp —</option>
+                <label className="mb-1 block text-xs font-bold text-muted">Trình độ *</label>
+                <select value={newCourse} onChange={(e) => { setNewCourse(e.target.value); setNewClassId(""); }} required className="input-field">
+                  <option value="">— Chọn trình độ —</option>
                   {COURSES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
@@ -317,12 +331,28 @@ export function StudentList() {
                 <input type="date" value={newStartDate} onChange={(e) => setNewStartDate(e.target.value)} required className="input-field" />
               </div>
             </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold text-muted">Xếp vào lớp học (tuỳ chọn)</label>
+              <select value={newClassId} onChange={(e) => setNewClassId(e.target.value)} className="input-field">
+                <option value="">— Chưa xếp lớp —</option>
+                {classes
+                  .filter((c) => !newCourse || c.course === newCourse)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{c.classCode ? ` (${c.classCode})` : ""}{c.teacher ? ` · ${c.teacher}` : ""}
+                    </option>
+                  ))}
+              </select>
+              {newCourse && classes.filter((c) => c.course === newCourse).length === 0 && (
+                <p className="mt-1 text-[0.7rem] text-amber-600">Chưa có lớp học nào cho trình độ {newCourse}. Có thể ghi danh sau ở mục Lớp học.</p>
+              )}
+            </div>
             <input type="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="Số điện thoại (= mật khẩu đăng nhập)" autoComplete="off" className="input-field" />
             <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="Email (tuỳ chọn)" autoComplete="off" className="input-field" />
             <input type="text" value={newAddress} onChange={(e) => setNewAddress(e.target.value)} placeholder="Địa chỉ (tuỳ chọn)" autoComplete="off" className="input-field" />
-            <input type="text" value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="Mã HV (để trống = tự sinh theo tên+lớp+ngày)" autoComplete="off" className="input-field" />
+            <input type="text" value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="Mã HV (để trống = tự sinh theo tên+trình độ+ngày)" autoComplete="off" className="input-field" />
             <input type="text" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="Mật khẩu (để trống = dùng SĐT)" autoComplete="off" className="input-field" />
-            <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">Mã HV tự sinh theo <strong>tên + lớp + ngày đăng ký</strong> (vd <code>lehuongly7+170726</code>). Mật khẩu mặc định là <strong>SĐT</strong>. HS đăng nhập bằng Mã HV + mật khẩu.</p>
+            <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">Mã HV tự sinh theo <strong>tên + trình độ + ngày đăng ký</strong> (vd <code>lehuongly7+170726</code>). Mật khẩu mặc định là <strong>SĐT</strong>. HS đăng nhập bằng Mã HV + mật khẩu.</p>
             <div className="flex justify-end gap-3">
               <button type="button" onClick={() => setShowCreate(false)} className="btn-secondary">Huỷ</button>
               <button type="submit" disabled={creating} className="btn-primary">{creating ? "Đang tạo..." : "Tạo"}</button>
