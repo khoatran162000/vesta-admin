@@ -50,6 +50,16 @@ export default function ClassDetailPage() {
   function togglePick(sid: string) {
     setPicked((prev) => { const n = new Set(prev); n.has(sid) ? n.delete(sid) : n.add(sid); return n; });
   }
+  // Chọn/bỏ tất cả HS ĐANG HIỂN THỊ (theo kết quả tìm kiếm hiện tại)
+  const allFilteredPicked = filtered.length > 0 && filtered.every((s) => picked.has(s.id));
+  function toggleAllFiltered() {
+    setPicked((prev) => {
+      const n = new Set(prev);
+      if (allFilteredPicked) filtered.forEach((s) => n.delete(s.id));
+      else filtered.forEach((s) => n.add(s.id));
+      return n;
+    });
+  }
   async function enroll() {
     if (picked.size === 0) return alert("Chưa chọn học viên nào");
     const res = await api.post(`/classes/${classId}/enroll`, { studentIds: Array.from(picked) });
@@ -139,6 +149,16 @@ export default function ClassDetailPage() {
               <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm theo tên / mã HV..."
                 className="input-field pl-9" />
             </div>
+            {filtered.length > 0 && (
+              <label className="mb-2 flex cursor-pointer items-center gap-3 rounded-lg bg-cream px-3 py-2 hover:bg-cream-dark">
+                <input type="checkbox" checked={allFilteredPicked}
+                  ref={(el) => { if (el) el.indeterminate = picked.size > 0 && !allFilteredPicked && filtered.some((s) => picked.has(s.id)); }}
+                  onChange={toggleAllFiltered} className="h-4 w-4" />
+                <span className="text-sm font-semibold text-royal">
+                  Chọn tất cả {q.trim() ? "(kết quả tìm kiếm)" : ""} — {filtered.length} học viên
+                </span>
+              </label>
+            )}
             <div className="mb-3 flex-1 overflow-y-auto rounded-lg border border-silver/30">
               {filtered.length === 0 ? (
                 <div className="py-10 text-center text-sm text-muted">Không có học viên phù hợp (đã trong lớp thì bị ẩn).</div>
@@ -153,7 +173,10 @@ export default function ClassDetailPage() {
               ))}
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted">Đã chọn: <b className="text-royal">{picked.size}</b></span>
+              <span className="text-sm text-muted">
+                Đã chọn: <b className="text-royal">{picked.size}</b>
+                {picked.size > 0 && <button onClick={() => setPicked(new Set())} className="ml-2 text-xs text-muted underline hover:text-royal">bỏ chọn</button>}
+              </span>
               <div className="flex gap-2">
                 <button onClick={() => setAddOpen(false)} className="btn-secondary">Huỷ</button>
                 <button onClick={enroll} className="btn-primary"><UserPlus size={14} />Thêm vào lớp</button>
