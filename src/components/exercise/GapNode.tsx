@@ -4,9 +4,7 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
 import { useState } from "react";
-
 export type GapType = "TEXT" | "DROPDOWN" | "DRAG";
-
 // ─── React view: hiển thị chip + popup chỉnh sửa ───
 function GapView(props: any) {
   const { node, updateAttributes, deleteNode, editor } = props;
@@ -15,19 +13,14 @@ function GapView(props: any) {
   const type: GapType = node.attrs.type || "TEXT";
   const answers: string = node.attrs.answers || "";
   const options: string = node.attrs.options || "";
-
+  const hint: string = node.attrs.hint || "";
   const editable = editor?.isEditable;
-
   const typeColor =
     type === "TEXT" ? "bg-blue-100 text-blue-700 border-blue-300"
     : type === "DROPDOWN" ? "bg-purple-100 text-purple-700 border-purple-300"
     : "bg-amber-100 text-amber-700 border-amber-300";
-
   const typeLabel = type === "TEXT" ? "Điền" : type === "DROPDOWN" ? "Dropdown" : "Kéo-thả";
-
-  // Preview text trong chip: đáp án đầu tiên
   const firstAnswer = answers.split("#")[0]?.trim() || "___";
-
   return (
     <NodeViewWrapper as="span" className="inline-block align-baseline">
       <span className="relative inline-block">
@@ -40,8 +33,8 @@ function GapView(props: any) {
         >
           <span className="text-[0.65rem] font-bold opacity-60">{gapId}</span>
           <span>{firstAnswer}</span>
+          {hint && <span className="text-[0.7rem]" title="Có gợi ý">💡</span>}
         </button>
-
         {open && editable && (
           <span
             contentEditable={false}
@@ -50,7 +43,6 @@ function GapView(props: any) {
             <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-gray-500">
               Chỗ trống #{gapId}
             </span>
-
             <label className="mb-1 block text-xs font-medium text-gray-600">Loại</label>
             <select
               value={type}
@@ -61,7 +53,6 @@ function GapView(props: any) {
               <option value="DROPDOWN">Dropdown (chọn)</option>
               <option value="DRAG">Kéo-thả</option>
             </select>
-
             <label className="mb-1 block text-xs font-medium text-gray-600">
               Đáp án đúng (nhiều đáp án ngăn bằng #)
             </label>
@@ -72,7 +63,6 @@ function GapView(props: any) {
               placeholder="vd: color#colour"
               className="mb-2 w-full rounded border border-gray-300 px-2 py-1 text-sm"
             />
-
             {type === "DROPDOWN" && (
               <>
                 <label className="mb-1 block text-xs font-medium text-gray-600">
@@ -87,7 +77,16 @@ function GapView(props: any) {
                 />
               </>
             )}
-
+            <label className="mb-1 block text-xs font-medium text-gray-600">
+              Gợi ý (tuỳ chọn — để trống sẽ tự gợi ý chữ cái đầu)
+            </label>
+            <input
+              type="text"
+              value={hint}
+              onChange={(e) => updateAttributes({ hint: e.target.value })}
+              placeholder="vd: động từ chỉ xu hướng tăng"
+              className="mb-2 w-full rounded border border-gray-300 px-2 py-1 text-sm"
+            />
             <span className="flex items-center justify-between">
               <button
                 type="button"
@@ -110,32 +109,28 @@ function GapView(props: any) {
     </NodeViewWrapper>
   );
 }
-
 // ─── Node definition ───
 export const GapNode = Node.create({
   name: "gap",
   group: "inline",
   inline: true,
-  atom: true,        // coi như 1 đơn vị không chia nhỏ
+  atom: true,
   selectable: true,
-
   addAttributes() {
     return {
       gapId: { default: "1" },
       type: { default: "TEXT" },
-      answers: { default: "" },   // chuỗi "color#colour"
-      options: { default: "" },   // chuỗi "a, b, c" (cho dropdown)
+      answers: { default: "" },
+      options: { default: "" },
+      hint: { default: "" },    // gợi ý tay (để trống → tự sinh khi render cho HS)
     };
   },
-
   parseHTML() {
     return [{ tag: "span[data-gap]" }];
   },
-
   renderHTML({ HTMLAttributes }) {
     return ["span", mergeAttributes(HTMLAttributes, { "data-gap": "" })];
   },
-
   addNodeView() {
     return ReactNodeViewRenderer(GapView);
   },

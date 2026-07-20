@@ -10,6 +10,7 @@ export interface GapDef {
   type: "TEXT" | "DROPDOWN" | "DRAG";
   answers: string[];
   options?: string[];
+  hint?: string;
 }
 export interface GapData {
   content: string;            // "Yellow is [[gap:1]]..."
@@ -37,6 +38,7 @@ function serialize(editor: any): GapData {
         ...(node.attrs.type === "DROPDOWN"
           ? { options: String(node.attrs.options || "").split(",").map((s: string) => s.trim()).filter(Boolean) }
           : {}),
+        ...(node.attrs.hint ? { hint: String(node.attrs.hint).trim() } : {}),
       };
       return false; // không đi sâu vào trong gap (atom)
     }
@@ -73,6 +75,7 @@ function buildInitialContent(data?: GapData): any {
           type: g.type || "TEXT",
           answers: (g.answers || []).join("#"),
           options: (g.options || []).join(", "),
+          hint: g.hint || "",
         },
       });
     } else if (part.length > 0) {
