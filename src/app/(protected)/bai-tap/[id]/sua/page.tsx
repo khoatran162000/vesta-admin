@@ -23,6 +23,8 @@ function metaFromExercise(ex: any): MetaState {
     visibility: ex.visibility || "PUBLIC",
     visibleTo: ex.visibleTo ? String(ex.visibleTo).split(",").map((s: string) => s.trim()).filter(Boolean) : [],
     isPublished: !!ex.isPublished,
+    timeLimit: ex.timeLimit != null ? String(ex.timeLimit) : "",
+    maxAttempts: ex.maxAttempts != null ? String(ex.maxAttempts) : "",
   };
 }
 
@@ -131,6 +133,8 @@ export default function EditExercisePage() {
       visibility: meta.visibility,
       visibleTo: meta.visibility === "CLASS" ? meta.visibleTo.join(",") : null,
       isPublished: meta.isPublished,
+      timeLimit: meta.timeLimit === "" ? null : Number(meta.timeLimit),
+      maxAttempts: meta.maxAttempts === "" ? null : Number(meta.maxAttempts),
     };
 
     if (isGap) {

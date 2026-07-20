@@ -53,6 +53,8 @@ export default function CreateMatchingPage() {
       visibility: meta.visibility,
       visibleTo: meta.visibility === "CLASS" ? meta.visibleTo.join(",") : null,
       isPublished: meta.isPublished,
+      timeLimit: meta.timeLimit === "" ? null : Number(meta.timeLimit),
+      maxAttempts: meta.maxAttempts === "" ? null : Number(meta.maxAttempts),
     });
     setSaving(false);
     if (data.success) router.push("/bai-tap");

@@ -1,13 +1,11 @@
 // FILE: src/app/(protected)/ngan-hang-de/de-thi/[examId]/page.tsx — Sua de thi
 "use client";
-
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useRequireAdmin } from "@/hooks/useRequireAdmin";
-
 export default function EditExamPage() {
   useRequireAdmin("/ngan-hang-de/de-thi");
   const params = useParams();
@@ -17,9 +15,9 @@ export default function EditExamPage() {
   const [title, setTitle] = useState(""); const [categoryId, setCategoryId] = useState("");
   const [description, setDescription] = useState(""); const [duration, setDuration] = useState("");
   const [totalScore, setTotalScore] = useState(""); const [status, setStatus] = useState("");
+  const [maxAttempts, setMaxAttempts] = useState("");
   const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
   useEffect(() => {
     async function load() {
       try {
@@ -29,22 +27,23 @@ export default function EditExamPage() {
           const e = examData.data;
           setTitle(e.title); setCategoryId(e.categoryId); setDescription(e.description || "");
           setDuration(String(e.duration)); setTotalScore(String(e.totalScore)); setStatus(e.status);
+          setMaxAttempts(e.maxAttempts != null ? String(e.maxAttempts) : "");
         }
       } catch {} finally { setLoading(false); }
     }
     load();
   }, [examId]);
-
   async function handleSave() {
     setSaving(true); setError("");
     try {
-      const data = await api.put(`/exams/${examId}`, { title, categoryId, description, duration, totalScore, status });
+      const data = await api.put(`/exams/${examId}`, {
+        title, categoryId, description, duration, totalScore, status,
+        maxAttempts: maxAttempts === "" ? null : Number(maxAttempts),
+      });
       if (data.success) router.push("/ngan-hang-de/de-thi"); else setError(data.message);
     } catch { setError("Lỗi server"); } finally { setSaving(false); }
   }
-
   if (loading) return <div className="flex justify-center py-20"><Loader2 size={24} className="animate-spin text-gold" /></div>;
-
   return (
     <div className="mx-auto max-w-[700px]">
       <div className="mb-6 flex items-center gap-3">
@@ -56,9 +55,12 @@ export default function EditExamPage() {
         <div><label className="mb-1 block text-sm font-medium text-royal">Tên đề thi *</label><input value={title} onChange={(e) => setTitle(e.target.value)} className="input-field" /></div>
         <div><label className="mb-1 block text-sm font-medium text-royal">Danh mục *</label><select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="input-field"><option value="">— Chọn —</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
         <div><label className="mb-1 block text-sm font-medium text-royal">Mô tả</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="input-field" /></div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <div><label className="mb-1 block text-sm font-medium text-royal">Thời gian (phút)</label><input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} className="input-field" /></div>
           <div><label className="mb-1 block text-sm font-medium text-royal">Tổng điểm</label><input type="number" value={totalScore} onChange={(e) => setTotalScore(e.target.value)} className="input-field" /></div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div><label className="mb-1 block text-sm font-medium text-royal">Số lượt chấm điểm</label><input type="number" min="1" value={maxAttempts} onChange={(e) => setMaxAttempts(e.target.value)} placeholder="Trống = không giới hạn" className="input-field" /></div>
           <div><label className="mb-1 block text-sm font-medium text-royal">Trạng thái</label><select value={status} onChange={(e) => setStatus(e.target.value)} className="input-field"><option value="DRAFT">Draft</option><option value="PUBLISHED">Published</option></select></div>
         </div>
         <div className="flex items-center justify-between">

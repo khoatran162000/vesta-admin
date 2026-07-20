@@ -1,32 +1,31 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useRequireAdmin } from "@/hooks/useRequireAdmin";
-
 export default function CreateExamPage() {
   useRequireAdmin("/ngan-hang-de/de-thi");
   const router = useRouter();
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [title, setTitle] = useState(""); const [categoryId, setCategoryId] = useState("");
   const [description, setDescription] = useState(""); const [duration, setDuration] = useState("60");
-  const [totalScore, setTotalScore] = useState("100"); const [saving, setSaving] = useState(false);
+  const [totalScore, setTotalScore] = useState("100"); const [maxAttempts, setMaxAttempts] = useState("");
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
   useEffect(() => { api.get("/categories/flat").then((d) => { if (d.success) setCategories(d.data); }); }, []);
-
   async function handleSave() {
     if (!title || !categoryId) return; setSaving(true); setError("");
     try {
-      const data = await api.post("/exams", { title, categoryId, description, duration, totalScore });
+      const data = await api.post("/exams", {
+        title, categoryId, description, duration, totalScore,
+        maxAttempts: maxAttempts === "" ? null : Number(maxAttempts),
+      });
       if (data.success) router.push(`/ngan-hang-de/de-thi/${data.data.id}/cau-hoi`);
       else setError(data.message);
     } catch { setError("Lỗi server"); } finally { setSaving(false); }
   }
-
   return (
     <div className="mx-auto max-w-[700px]">
       <div className="mb-6 flex items-center gap-3">
@@ -38,10 +37,12 @@ export default function CreateExamPage() {
         <div><label className="mb-1 block text-sm font-medium text-royal">Tên đề thi *</label><input value={title} onChange={(e) => setTitle(e.target.value)} className="input-field" placeholder="VD: IELTS Listening Practice Test 1" /></div>
         <div><label className="mb-1 block text-sm font-medium text-royal">Danh mục *</label><select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="input-field"><option value="">— Chọn danh mục —</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
         <div><label className="mb-1 block text-sm font-medium text-royal">Mô tả</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="input-field" placeholder="Mô tả đề thi (tuỳ chọn)" /></div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div><label className="mb-1 block text-sm font-medium text-royal">Thời gian (phút) *</label><input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} className="input-field" /></div>
           <div><label className="mb-1 block text-sm font-medium text-royal">Tổng điểm *</label><input type="number" value={totalScore} onChange={(e) => setTotalScore(e.target.value)} className="input-field" /></div>
+          <div><label className="mb-1 block text-sm font-medium text-royal">Số lượt chấm</label><input type="number" min="1" value={maxAttempts} onChange={(e) => setMaxAttempts(e.target.value)} placeholder="Trống = ∞" className="input-field" /></div>
         </div>
+        <p className="rounded-lg bg-blue-50 px-3 py-2 text-[0.7rem] text-blue-700">Vượt số lượt chấm, học viên vẫn làm lại được nhưng tính là <strong>lượt ôn tập</strong> (không cộng vào điểm chính thức).</p>
         <button onClick={handleSave} disabled={saving || !title || !categoryId} className="btn-primary"><Save size={15} />{saving ? "Đang lưu..." : "Tạo đề thi & thêm câu hỏi →"}</button>
       </div>
     </div>
