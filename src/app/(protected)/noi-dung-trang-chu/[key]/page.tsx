@@ -5,17 +5,15 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Loader2, Plus, Trash2, ImagePlus, X } from "lucide-react";
 import { api, getImageUrl } from "@/lib/api";
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 function getToken() { return localStorage.getItem("accessToken") || ""; }
-
 const LABELS: Record<string, string> = {
   hero: "Hero (banner đầu trang)",
   philosophy: "Phong cách dạy & Nội quy",
   tuition: "Thông tin học phí",
   books_spark: "Mô tả SPARK",
+  logo: "Logo & Favicon",
 };
-
 export default function EditSiteContentPage() {
   const { key } = useParams<{ key: string }>();
   const router = useRouter();
@@ -25,31 +23,75 @@ export default function EditSiteContentPage() {
   const [qrFile, setQrFile] = useState<File | null>(null);
   const [qrPreview, setQrPreview] = useState("");
   const qrRef = useRef<HTMLInputElement>(null);
-
+  // Logo & favicon
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState("");
+  const [faviconBlob, setFaviconBlob] = useState<Blob | null>(null);
+  const [faviconPreview, setFaviconPreview] = useState("");
+  const logoRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     (async () => {
       const res = await api.get(`/site-content/${key}`);
       if (res.success) {
         setData(res.data.data || {});
         if (key === "tuition" && res.data.data?.bank?.qrUrl) setQrPreview(getImageUrl(res.data.data.bank.qrUrl));
+        if (key === "logo" && res.data.data?.logoUrl) setLogoPreview(getImageUrl(res.data.data.logoUrl));
+        if (key === "logo" && res.data.data?.faviconUrl) setFaviconPreview(getImageUrl(res.data.data.faviconUrl));
       } else {
         setData({}); // chưa có → khối rỗng, sẽ tạo khi lưu
       }
     })();
   }, [key]);
-
   function handleQr(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return;
     setQrFile(f);
     const r = new FileReader(); r.onload = () => setQrPreview(r.result as string); r.readAsDataURL(f);
     e.target.value = "";
   }
-
+  function handleLogo(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; if (!f) return;
+    setLogoFile(f);
+    const r = new FileReader();
+    r.onload = () => {
+      const dataUrl = r.result as string;
+      setLogoPreview(dataUrl);
+      // Sinh favicon vuông từ logo: canvas 64x64, nền trắng, fit contain
+      const img = new Image();
+      img.onload = () => {
+        const S = 64;
+        const cv = document.createElement("canvas");
+        cv.width = S; cv.height = S;
+        const ctx = cv.getContext("2d");
+        if (!ctx) return;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, S, S);
+        const scale = Math.min(S / img.width, S / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        ctx.drawImage(img, (S - w) / 2, (S - h) / 2, w, h);
+        cv.toBlob((blob) => {
+          if (blob) { setFaviconBlob(blob); setFaviconPreview(cv.toDataURL("image/png")); }
+        }, "image/png");
+      };
+      img.src = dataUrl;
+    };
+    r.readAsDataURL(f);
+    e.target.value = "";
+  }
   async function handleSave() {
     setSaving(true); setError("");
     try {
-      // Nếu có upload QR (chỉ khối tuition) → gửi FormData
-      if (key === "tuition" && qrFile) {
+      if (key === "logo" && (logoFile || faviconBlob)) {
+        // Khối logo: upload logo + favicon (FormData)
+        const fd = new FormData();
+        fd.append("label", LABELS[key] || key);
+        fd.append("data", JSON.stringify(data || {}));
+        if (logoFile) fd.append("logo", logoFile);
+        if (faviconBlob) fd.append("favicon", faviconBlob, "favicon.png");
+        const res = await fetch(`${API_URL}/site-content/${key}`, { method: "PUT", headers: { Authorization: `Bearer ${getToken()}` }, body: fd });
+        const j = await res.json();
+        if (!j.success) throw new Error(j.message);
+      } else if (key === "tuition" && qrFile) {
+        // Khối tuition: upload QR (FormData)
         const fd = new FormData();
         fd.append("label", LABELS[key] || key);
         fd.append("data", JSON.stringify(data));
@@ -66,9 +108,7 @@ export default function EditSiteContentPage() {
       setError(e.message || "Lỗi lưu nội dung");
     } finally { setSaving(false); }
   }
-
   if (!data) return <div className="flex justify-center py-20"><Loader2 size={24} className="animate-spin text-gold" /></div>;
-
   return (
     <div className="mx-auto max-w-[780px]">
       <div className="mb-6 flex items-center gap-3">
@@ -76,7 +116,6 @@ export default function EditSiteContentPage() {
         <h2 className="font-display text-2xl font-bold text-royal">Sửa: {LABELS[key] || key}</h2>
       </div>
       {error && <p className="mb-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
-
       {/* ===== HERO ===== */}
       {key === "hero" && (
         <div className="card space-y-4">
@@ -90,7 +129,6 @@ export default function EditSiteContentPage() {
           </div>
         </div>
       )}
-
       {/* ===== PHILOSOPHY ===== */}
       {key === "philosophy" && (
         <ItemsHtmlEditor
@@ -99,7 +137,6 @@ export default function EditSiteContentPage() {
           label="Các đoạn nội quy (mỗi ô 1 đoạn, hỗ trợ HTML)"
         />
       )}
-
       {/* ===== BOOKS_SPARK ===== */}
       {key === "books_spark" && (
         <div className="card">
@@ -108,7 +145,30 @@ export default function EditSiteContentPage() {
           <HtmlHint />
         </div>
       )}
-
+      {/* ===== LOGO ===== */}
+      {key === "logo" && (
+        <div className="card space-y-5">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-royal">Logo trang (hiển thị ở header, banner...)</label>
+            {logoPreview ? (
+              <div className="relative inline-block">
+                <img src={logoPreview} alt="Logo" className="h-32 w-32 rounded-lg border object-contain bg-white p-2" />
+                <button onClick={() => { setLogoFile(null); setLogoPreview(""); setFaviconBlob(null); setFaviconPreview(""); }} className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white"><X size={14} /></button>
+              </div>
+            ) : (
+              <button onClick={() => logoRef.current?.click()} className="flex h-32 w-32 items-center justify-center rounded-lg border-2 border-dashed border-silver/40 bg-cream hover:border-gold/40"><ImagePlus size={26} className="text-muted" /></button>
+            )}
+            <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={handleLogo} />
+            <p className="mt-1 text-xs text-muted">Chọn logo mới sẽ tự tạo favicon (icon tab trình duyệt) vuông. Bỏ trống = giữ logo hiện tại.</p>
+          </div>
+          {faviconPreview && (
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-royal">Favicon tự tạo (xem trước)</label>
+              <img src={faviconPreview} alt="Favicon" className="h-16 w-16 rounded border object-contain bg-white p-1" />
+            </div>
+          )}
+        </div>
+      )}
       {/* ===== TUITION ===== */}
       {key === "tuition" && (
         <div className="space-y-5">
@@ -149,7 +209,6 @@ export default function EditSiteContentPage() {
           </div>
         </div>
       )}
-
       <div className="mt-6 flex items-center justify-end gap-3 border-t border-silver/20 pt-6">
         <Link href="/noi-dung-trang-chu" className="btn-secondary">Huỷ</Link>
         <button onClick={handleSave} disabled={saving} className="btn-primary">
@@ -159,11 +218,9 @@ export default function EditSiteContentPage() {
     </div>
   );
 }
-
 function HtmlHint() {
   return <p className="mt-1.5 text-xs text-muted">Có thể dùng: <code>&lt;strong&gt;in đậm&lt;/strong&gt;</code>, <code>&lt;a href="..."&gt;link&lt;/a&gt;</code>. Emoji gõ trực tiếp.</p>;
 }
-
 function ItemsHtmlEditor({ items, onChange, label, withStyle }: { items: any[]; onChange: (v: any[]) => void; label: string; withStyle?: boolean }) {
   function setItem(i: number, patch: any) { onChange(items.map((it, x) => x === i ? { ...it, ...patch } : it)); }
   function add() { onChange([...items, withStyle ? { html: "", style: "normal" } : { html: "" }]); }
