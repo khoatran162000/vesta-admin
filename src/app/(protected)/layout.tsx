@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, BookOpen, GraduationCap, Bell, UserCircle,
-  LogOut, ChevronDown, Calendar, FileText, Target, BarChart3,
+  LogOut, ChevronDown, Calendar, FileText, Target, BarChart3, ShieldAlert
 } from "lucide-react";
 import { useAuth, ROLE_LABELS } from "@/hooks/useAuth";
 
@@ -46,6 +46,7 @@ const NAV: NavItem[] = [
     { href: "/noi-dung-trang-chu", label: "Nội dung trang chủ", roles: CMS },
   ]},
   { href: "/theo-doi", label: "Theo dõi học viên", icon: GraduationCap, roles: STAFF },
+  { href: "/theo-doi/ky-luat", label: "Kỷ luật học tập", icon: ShieldAlert, roles: STAFF },
   { label: "Báo cáo", icon: BarChart3, roles: STAFF, children: [
     { href: "/bao-cao", label: "Tổng hợp điểm" },
     { href: "/bao-cao/dinh-ky", label: "Báo cáo định kỳ" },
