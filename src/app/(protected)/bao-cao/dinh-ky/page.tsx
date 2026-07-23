@@ -36,6 +36,9 @@ export default function ReportListPage() {
           <h2 className="font-display text-2xl font-bold text-royal">📄 Báo Cáo Định Kỳ</h2>
           <p className="mt-1 text-sm text-muted">{reports.length} báo cáo</p>
         </div>
+        <Link href="/bao-cao/dinh-ky/up-anh" className="btn-secondary">
+          🖼 Up ảnh hàng loạt
+        </Link>
         <Link href="/bao-cao/dinh-ky/tao-moi" className="btn-primary">
           <Plus size={16} />Tạo báo cáo
         </Link>
