@@ -2,13 +2,11 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Loader2, Pencil, Trash2, Eye } from "lucide-react";
+import { Plus, Loader2, Pencil, Trash2, Eye, ImagePlus } from "lucide-react";
 import { api } from "@/lib/api";
-
 export default function ReportListPage() {
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
   const load = useCallback(async () => {
     setLoading(true);
     const data = await api.get("/reports");
@@ -16,19 +14,16 @@ export default function ReportListPage() {
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
-
   async function handleDelete(id: string) {
     if (!confirm("Xoá báo cáo này?")) return;
     const data = await api.delete(`/reports/${id}`);
     if (data.success) load();
     else alert(data.message || "Lỗi xoá");
   }
-
   function fmtDate(d: string | null) {
     if (!d) return "—";
     return new Date(d).toLocaleDateString("vi-VN");
   }
-
   return (
     <div className="mx-auto max-w-[1100px]">
       <div className="mb-6 flex items-center justify-between">
@@ -36,19 +31,31 @@ export default function ReportListPage() {
           <h2 className="font-display text-2xl font-bold text-royal">📄 Báo Cáo Định Kỳ</h2>
           <p className="mt-1 text-sm text-muted">{reports.length} báo cáo</p>
         </div>
-        <Link href="/bao-cao/dinh-ky/up-anh" className="btn-secondary">
-          🖼 Up ảnh hàng loạt
-        </Link>
-        <Link href="/bao-cao/dinh-ky/tao-moi" className="btn-primary">
-          <Plus size={16} />Tạo báo cáo
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/bao-cao/dinh-ky/up-anh" className="btn-secondary">
+            <ImagePlus size={15} />Up ảnh hàng loạt
+          </Link>
+          <Link href="/bao-cao/dinh-ky/tao-moi" className="btn-primary">
+            <Plus size={16} />Tạo báo cáo
+          </Link>
+        </div>
       </div>
-
       <div className="overflow-x-auto rounded-xl border border-silver/30 bg-white">
         {loading ? (
           <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-gold" /></div>
         ) : reports.length === 0 ? (
-          <div className="py-16 text-center text-sm text-muted">Chưa có báo cáo nào.</div>
+          <div className="px-6 py-16 text-center">
+            <p className="text-sm text-muted">Chưa có báo cáo nào.</p>
+            <div className="mx-auto mt-6 max-w-md rounded-xl border border-gold/30 bg-cream/60 p-5">
+              <p className="text-sm font-semibold text-royal">Đã có sẵn nhiều ảnh báo cáo?</p>
+              <p className="mt-1 text-xs text-muted">
+                Chọn một lượt cả loạt ảnh — hệ thống tự khớp tên file với học sinh, bạn soát lại rồi lưu một lần.
+              </p>
+              <Link href="/bao-cao/dinh-ky/up-anh" className="btn-primary mt-4 inline-flex">
+                <ImagePlus size={15} />Up ảnh hàng loạt
+              </Link>
+            </div>
+          </div>
         ) : (
           <table className="w-full text-left text-sm">
             <thead><tr className="border-b bg-cream">
