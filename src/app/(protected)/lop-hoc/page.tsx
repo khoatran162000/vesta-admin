@@ -1,12 +1,40 @@
 // FILE: src/app/(protected)/lop-hoc/page.tsx — Nội dung lớp học (3 tab)
 "use client";
-import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Save, Loader2, X, BookOpen, FileText, PenTool } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Plus, Trash2, Save, Loader2, X, BookOpen, FileText, PenTool, ImagePlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLevels } from "@/lib/useLevels";
 import HtmlPasteBox from "@/components/HtmlPasteBox";
 type Section = "diary" | "materials" | "feedback";
-
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE = (API_URL || "").replace(/\/api\/?$/, "");
+function getToken() { return localStorage.getItem("accessToken") || ""; }
+// ─── Nội dung dạng ẢNH: lưu trong contentHtml, có dấu nhận biết để mở lại đúng chế độ ───
+const IMG_MARK = "<!--vesta-image-->";
+function buildImageHtml(url: string): string {
+  return `${IMG_MARK}<div style="margin:0;padding:0;text-align:center;background:#fff"><img src="${url}" alt="" style="max-width:100%;height:auto;display:block;margin:0 auto" /></div>`;
+}
+function extractImageUrl(html?: string | null): string {
+  if (!html || !String(html).startsWith(IMG_MARK)) return "";
+  const m = String(html).match(/<img src="([^"]+)"/);
+  return m ? m[1] : "";
+}
+function isImageHtml(html?: string | null): boolean {
+  return !!html && String(html).startsWith(IMG_MARK);
+}
+// Upload 1 ảnh → trả URL tuyệt đối (cần tuyệt đối để hiện được trong iframe)
+async function uploadImage(file: File): Promise<string> {
+  const fd = new FormData();
+  fd.append("image", file);
+  const res = await fetch(`${API_URL}/reports/upload-image`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: fd,
+  });
+  const j = await res.json();
+  if (!j.success) throw new Error(j.message || "Lỗi upload ảnh");
+  return `${API_BASE}${j.data.url}`;
+}
 // Parse bảng điểm dán từ Excel/Sheets: mỗi dòng 1 HS, cột tách bằng tab
 function parseScoreTable(text: string): { name: string; vocab: string; attitude: string; score: string }[] {
   return text
@@ -24,7 +52,6 @@ function parseScoreTable(text: string): { name: string; vocab: string; attitude:
     })
     .filter((r) => r.name); // bỏ dòng không có tên
 }
-
 export default function ClassContentPage() {
   const COURSES = useLevels();
   const [section, setSection] = useState<Section>("diary");
@@ -143,7 +170,9 @@ export default function ClassContentPage() {
                   <td className="px-4 py-3 text-muted">{i + 1}</td>
                   <td className="px-4 py-3 font-medium text-[#1a1a2e]">{m.title}</td>
                   <td className="px-4 py-3"><span className="rounded bg-cream px-2 py-0.5 text-xs text-muted">{m.fileType || "FILE"}</span></td>
-                  <td className="px-4 py-3">{m.contentHtml
+                  <td className="px-4 py-3">{isImageHtml(m.contentHtml)
+                    ? <span className="rounded bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">Ảnh</span>
+                    : m.contentHtml
                     ? <span className="rounded bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">Bài HTML</span>
                     : <a href={m.fileUrl} target="_blank" className="text-xs text-gold underline">Mở link</a>}</td>
                   <td className="px-4 py-3 text-right">
@@ -196,27 +225,75 @@ export default function ClassContentPage() {
     </div>
   );
 }
+// ─── Ô up ảnh (dùng chung cho cả 3 tab) ───
+function ImageUploadBox({ label, value, onChange, hint }: { label: string; value: string; onChange: (html: string) => void; hint?: string }) {
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState("");
+  const ref = useRef<HTMLInputElement>(null);
+  const url = extractImageUrl(value);
+  async function pick(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setUploading(true); setErr("");
+    try {
+      const u = await uploadImage(f);
+      onChange(buildImageHtml(u));
+    } catch (ex: any) {
+      setErr(ex.message || "Lỗi upload ảnh");
+    } finally {
+      setUploading(false);
+    }
+  }
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-bold text-muted">{label}</label>
+      {url ? (
+        <div className="relative inline-block">
+          <img src={url} alt="" className="max-h-64 rounded-lg border border-silver/30 bg-white object-contain p-1" />
+          <button type="button" onClick={() => onChange("")}
+            className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white"><X size={13} /></button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => ref.current?.click()} disabled={uploading}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-silver/40 bg-cream py-8 text-sm font-semibold text-muted hover:border-gold/50 hover:text-royal disabled:opacity-50">
+          {uploading ? <><Loader2 size={18} className="animate-spin" />Đang tải ảnh...</> : <><ImagePlus size={20} />Chọn ảnh từ máy</>}
+        </button>
+      )}
+      <input ref={ref} type="file" accept="image/*" className="hidden" onChange={pick} />
+      {err && <p className="mt-1 text-xs text-red-600">{err}</p>}
+      {hint && <p className="mt-1 text-[0.7rem] text-muted">{hint}</p>}
+    </div>
+  );
+}
 function Modal({ section, item, onClose, onSave }: { section: Section; item: any; onClose: () => void; onSave: (d: any) => void }) {
   const [form, setForm] = useState<any>(item || {});
   const [saving, setSaving] = useState(false);
-  const [diaryMode, setDiaryMode] = useState<"form" | "html">(item?.contentHtml ? "html" : "form");
-  const [matMode, setMatMode] = useState<"link" | "html">(item?.contentHtml ? "html" : "link");
-  const [fbMode, setFbMode] = useState<"form" | "html">(item?.commentHtml ? "html" : "form");
+  const [diaryMode, setDiaryMode] = useState<"form" | "html" | "image">(isImageHtml(item?.contentHtml) ? "image" : item?.contentHtml ? "html" : "form");
+  const [matMode, setMatMode] = useState<"link" | "html" | "image">(isImageHtml(item?.contentHtml) ? "image" : item?.contentHtml ? "html" : "link");
+  const [fbMode, setFbMode] = useState<"form" | "html" | "image">(isImageHtml(item?.commentHtml) ? "image" : item?.commentHtml ? "html" : "form");
   const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));
   async function handleSubmit() {
     // Xoá hẳn field của mode không dùng (giống trang báo cáo) — tránh 2 nội dung cùng tồn tại
     const payload: any = { ...form };
     if (section === "materials") {
-      if (matMode === "html") {
-        if (!String(payload.contentHtml || "").trim()) return alert("Chưa dán mã HTML của tài liệu");
+      if (matMode === "html" || matMode === "image") {
+        if (!String(payload.contentHtml || "").trim()) {
+          return alert(matMode === "image" ? "Chưa chọn ảnh tài liệu" : "Chưa dán mã HTML của tài liệu");
+        }
         payload.fileUrl = "";
-        payload.fileType = "HTML";
-        } else {
+        payload.fileType = matMode === "image" ? "IMAGE" : "HTML";
+      } else {
         if (!String(payload.fileUrl || "").trim()) return alert("Chưa nhập link tài liệu");
         payload.contentHtml = null;
       }
+    } else if (section === "diary") {
+      if (diaryMode === "form") payload.contentHtml = null;
+      else if (!String(payload.contentHtml || "").trim()) {
+        return alert(diaryMode === "image" ? "Chưa chọn ảnh nội dung buổi học" : "Chưa dán mã HTML nội dung buổi học");
+      }
     } else if (section === "feedback") {
-      if (fbMode === "html") {
+      if (fbMode === "html" || fbMode === "image") {
         payload.teacherComment = "";
       } else {
         payload.commentHtml = null;
@@ -243,9 +320,10 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
         </div>
         <div className="space-y-3">
           {section === "diary" && (<>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <ModeBtn active={diaryMode === "form"} onClick={() => setDiaryMode("form")} label="Nhập thường" />
               <ModeBtn active={diaryMode === "html"} onClick={() => setDiaryMode("html")} label="Dán HTML" />
+              <ModeBtn active={diaryMode === "image"} onClick={() => setDiaryMode("image")} label="Up ảnh" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -308,19 +386,27 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
                   </div>
                 )}
               </div>
-            </>) : (
+            </>) : diaryMode === "html" ? (
               <HtmlPasteBox
                 label="Mã HTML nội dung buổi học"
                 value={form.contentHtml || ""}
                 onChange={(v) => set("contentHtml", v)}
                 hint="Dán cả trang HTML (kể cả <!doctype>, <style>) cũng được — học viên thấy đúng giao diện này. Vẫn nên điền Buổi số + Ngày ở trên."
               />
+            ) : (
+              <ImageUploadBox
+                label="Ảnh nội dung buổi học"
+                value={form.contentHtml || ""}
+                onChange={(v) => set("contentHtml", v)}
+                hint="Học viên mở buổi học sẽ thấy đúng ảnh này. Vẫn nên điền Buổi số + Ngày ở trên."
+              />
             )}
           </>)}
           {section === "materials" && (<>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <ModeBtn active={matMode === "link"} onClick={() => setMatMode("link")} label="Link / File" />
               <ModeBtn active={matMode === "html"} onClick={() => setMatMode("html")} label="Dán HTML" />
+              <ModeBtn active={matMode === "image"} onClick={() => setMatMode("image")} label="Up ảnh" />
             </div>
             <div>
               <label className="mb-1 block text-xs font-bold text-muted">Tên tài liệu</label>
@@ -346,12 +432,19 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
                   <option value="DOC">Word</option>
                 </select>
               </div>
-            </>) : (
+            </>) : matMode === "html" ? (
               <HtmlPasteBox
                 label="Mã HTML nội dung tài liệu"
                 value={form.contentHtml || ""}
                 onChange={(v) => set("contentHtml", v)}
                 hint="Học viên bấm vào tài liệu sẽ đọc HTML này ngay tại chỗ, không mở link ra ngoài."
+              />
+            ) : (
+              <ImageUploadBox
+                label="Ảnh tài liệu"
+                value={form.contentHtml || ""}
+                onChange={(v) => set("contentHtml", v)}
+                hint="Học viên bấm vào tài liệu sẽ xem ảnh này ngay tại chỗ. Chỉ học viên lớp này xem được."
               />
             )}
             <div>
@@ -370,21 +463,29 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
                 <div className="max-h-40 overflow-y-auto rounded-lg border border-silver/20 bg-cream p-3 text-sm text-[#1a1a2e] whitespace-pre-wrap">{item.studentWork}</div>
               </div>
             )}
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <ModeBtn active={fbMode === "form"} onClick={() => setFbMode("form")} label="Nhập thường" />
               <ModeBtn active={fbMode === "html"} onClick={() => setFbMode("html")} label="Dán HTML" />
+              <ModeBtn active={fbMode === "image"} onClick={() => setFbMode("image")} label="Up ảnh" />
             </div>
             {fbMode === "form" ? (
               <div>
                 <label className="mb-1 block text-xs font-bold text-muted">Nhận xét / Phản hồi</label>
                 <textarea value={form.teacherComment || ""} onChange={(e) => set("teacherComment", e.target.value)} rows={4} className="input-field" />
               </div>
-            ) : (
+            ) : fbMode === "html" ? (
               <HtmlPasteBox
                 label="Mã HTML nhận xét"
                 value={form.commentHtml || ""}
                 onChange={(v) => set("commentHtml", v)}
                 hint="Chỉ học viên này xem được nhận xét của mình."
+              />
+            ) : (
+              <ImageUploadBox
+                label="Ảnh nhận xét"
+                value={form.commentHtml || ""}
+                onChange={(v) => set("commentHtml", v)}
+                hint="Chỉ học viên này xem được ảnh nhận xét của mình."
               />
             )}
             <div>
