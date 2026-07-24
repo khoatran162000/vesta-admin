@@ -1,35 +1,71 @@
 // FILE: src/app/(protected)/theo-doi/[studentId]/vo-ghi/page.tsx
 // Admin/GV xem toàn bộ vở ghi của 1 HV + tạo nhận xét mới + chấm bài
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Loader2, Plus, MessageSquareText, Clock, CheckCircle2,
-  X, Save, Award, Trash2,
+  X, Save, Award, Trash2, ImagePlus,
 } from "lucide-react";
 import { api } from "@/lib/api";
-
+import HtmlPasteBox from "@/components/HtmlPasteBox";
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE = (API_URL || "").replace(/\/api\/?$/, "");
+function getToken() { return localStorage.getItem("accessToken") || ""; }
+// ─── Nhận xét dạng ẢNH: lưu trong commentHtml, có dấu nhận biết để mở lại đúng chế độ ───
+const IMG_MARK = "<!--vesta-image-->";
+function buildImageHtml(url: string): string {
+  return `${IMG_MARK}<div style="margin:0;padding:0;text-align:center;background:#fff"><img src="${url}" alt="" style="max-width:100%;height:auto;display:block;margin:0 auto" /></div>`;
+}
+function extractImageUrl(html?: string | null): string {
+  if (!html || !String(html).startsWith(IMG_MARK)) return "";
+  const m = String(html).match(/<img src="([^"]+)"/);
+  return m ? m[1] : "";
+}
+function isImageHtml(html?: string | null): boolean {
+  return !!html && String(html).startsWith(IMG_MARK);
+}
+async function uploadImage(file: File): Promise<string> {
+  const fd = new FormData();
+  fd.append("image", file);
+  const res = await fetch(`${API_URL}/reports/upload-image`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${getToken()}` },
+    body: fd,
+  });
+  const j = await res.json();
+  if (!j.success) throw new Error(j.message || "Lỗi upload ảnh");
+  return `${API_BASE}${j.data.url}`;
+}
+// Xem nhanh nội dung HTML trong danh sách (iframe cách ly, không phá style trang admin)
+function HtmlPreview({ html }: { html: string }) {
+  return (
+    <iframe
+      title="Nhận xét"
+      srcDoc={html}
+      sandbox="allow-same-origin"
+      className="w-full rounded-lg border border-silver/20 bg-white"
+      style={{ minHeight: 220 }}
+    />
+  );
+}
 export default function StudentNotebookPage() {
   const params = useParams();
   const studentId = params.studentId as string;
-
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState<any>(null); // null = tạo mới; object = chấm/sửa
   const [deleteItem, setDeleteItem] = useState<any>(null);
   const [deleting, setDeleting] = useState(false);
-
   const load = useCallback(async () => {
     setLoading(true);
     const res = await api.get(`/class/feedback/student/${studentId}`);
     if (res.success) setData(res.data);
     setLoading(false);
   }, [studentId]);
-
   useEffect(() => { load(); }, [load]);
-
   async function handleDelete() {
     if (!deleteItem) return;
     setDeleting(true);
@@ -39,12 +75,12 @@ export default function StudentNotebookPage() {
     setDeleteItem(null);
     load();
   }
-
   async function handleSave(form: any) {
     if (editItem?.id) {
       // Chấm/sửa bài đã có
       const res = await api.put(`/class/feedback/${editItem.id}/review`, {
         teacherComment: form.teacherComment,
+        commentHtml: form.commentHtml,
         score: form.score,
       });
       if (!res.success) { alert(res.message || "Lỗi lưu"); return; }
@@ -55,6 +91,7 @@ export default function StudentNotebookPage() {
         title: form.title,
         studentWork: form.studentWork,
         teacherComment: form.teacherComment,
+        commentHtml: form.commentHtml,
         score: form.score,
       });
       if (!res.success) { alert(res.message || "Lỗi tạo"); return; }
@@ -63,14 +100,11 @@ export default function StudentNotebookPage() {
     setEditItem(null);
     load();
   }
-
   if (loading) return <div className="flex justify-center py-20"><Loader2 size={24} className="animate-spin text-gold" /></div>;
   if (!data) return <p className="py-20 text-center text-muted">Không tìm thấy học viên.</p>;
-
   const { student, feedbacks, stats } = data;
   const pending = feedbacks.filter((f: any) => f.status === "PENDING");
   const reviewed = feedbacks.filter((f: any) => f.status === "REVIEWED");
-
   return (
     <div className="mx-auto max-w-[900px]">
       {/* Header */}
@@ -86,7 +120,6 @@ export default function StudentNotebookPage() {
           <Plus size={16} />Tạo nhận xét mới
         </button>
       </div>
-
       {/* Stats */}
       <div className="mb-6 grid grid-cols-4 gap-3">
         <div className="card text-center">
@@ -106,7 +139,6 @@ export default function StudentNotebookPage() {
           <p className="text-xs text-muted">Điểm TB</p>
         </div>
       </div>
-
       {/* Pending */}
       {pending.length > 0 && (
         <>
@@ -130,7 +162,6 @@ export default function StudentNotebookPage() {
           </div>
         </>
       )}
-
       {/* Reviewed */}
       <h3 className="mb-3 flex items-center gap-2 font-display text-lg font-bold text-royal">
         <CheckCircle2 size={18} className="text-green-600" />Đã chấm ({reviewed.length})
@@ -160,32 +191,39 @@ export default function StudentNotebookPage() {
                   <button onClick={() => setDeleteItem(fb)} className="rounded-lg p-1.5 text-muted hover:bg-red-50 hover:text-red-600" title="Xoá"><Trash2 size={14} /></button>
                 </div>
               </div>
-
               {fb.studentWork && (
                 <details className="mb-2">
                   <summary className="cursor-pointer text-xs font-semibold text-muted hover:text-royal">Xem bài làm của HV</summary>
                   <div className="mt-2 whitespace-pre-wrap rounded-lg bg-cream/60 p-3 text-xs text-[#1a1a2e]">{fb.studentWork}</div>
                 </details>
               )}
-
-              {fb.teacherComment && (
+              {/* Nhận xét: HTML/ảnh (nếu có) hoặc text thường */}
+              {fb.commentHtml ? (
+                <div className="rounded-lg border border-gold/30 bg-gold/5 p-3">
+                  <p className="mb-2 flex items-center gap-1.5 text-[0.65rem] font-bold uppercase tracking-wider text-gold">
+                    <MessageSquareText size={12} />Nhận xét của GV
+                    <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[0.6rem] font-semibold text-blue-700">
+                      {isImageHtml(fb.commentHtml) ? "Ảnh" : "HTML"}
+                    </span>
+                  </p>
+                  <HtmlPreview html={fb.commentHtml} />
+                </div>
+              ) : fb.teacherComment ? (
                 <div className="rounded-lg border border-gold/30 bg-gold/5 p-3">
                   <p className="mb-1 flex items-center gap-1.5 text-[0.65rem] font-bold uppercase tracking-wider text-gold">
                     <MessageSquareText size={12} />Nhận xét của GV
                   </p>
                   <p className="whitespace-pre-wrap text-sm text-[#1a1a2e]">{fb.teacherComment}</p>
                 </div>
-              )}
+              ) : null}
             </div>
           ))}
         </div>
       )}
-
       {showModal && (
         <FeedbackModal item={editItem} studentName={student.fullName}
           onClose={() => { setShowModal(false); setEditItem(null); }} onSave={handleSave} />
       )}
-
       {/* Modal xác nhận xoá */}
       {deleteItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 px-4">
@@ -208,37 +246,92 @@ export default function StudentNotebookPage() {
     </div>
   );
 }
-
+// ─── Ô up ảnh (dùng cho nhận xét dạng ảnh) ───
+function ImageUploadBox({ label, value, onChange, hint }: { label: string; value: string; onChange: (html: string) => void; hint?: string }) {
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState("");
+  const ref = useRef<HTMLInputElement>(null);
+  const url = extractImageUrl(value);
+  async function pick(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setUploading(true); setErr("");
+    try {
+      const u = await uploadImage(f);
+      onChange(buildImageHtml(u));
+    } catch (ex: any) {
+      setErr(ex.message || "Lỗi upload ảnh");
+    } finally {
+      setUploading(false);
+    }
+  }
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-bold text-muted">{label}</label>
+      {url ? (
+        <div className="relative inline-block">
+          <img src={url} alt="" className="max-h-56 rounded-lg border border-silver/30 bg-white object-contain p-1" />
+          <button type="button" onClick={() => onChange("")}
+            className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white"><X size={13} /></button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => ref.current?.click()} disabled={uploading}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-silver/40 bg-cream py-7 text-sm font-semibold text-muted hover:border-gold/50 hover:text-royal disabled:opacity-50">
+          {uploading ? <><Loader2 size={18} className="animate-spin" />Đang tải ảnh...</> : <><ImagePlus size={20} />Chọn ảnh từ máy</>}
+        </button>
+      )}
+      <input ref={ref} type="file" accept="image/*" className="hidden" onChange={pick} />
+      {err && <p className="mt-1 text-xs text-red-600">{err}</p>}
+      {hint && <p className="mt-1 text-[0.7rem] text-muted">{hint}</p>}
+    </div>
+  );
+}
 function FeedbackModal({ item, studentName, onClose, onSave }: {
   item: any; studentName: string; onClose: () => void; onSave: (d: any) => void;
 }) {
   const isReview = !!item?.id; // có item = chấm bài đã có; không = tạo mới
   const [form, setForm] = useState<any>(
-    item || { title: "", studentWork: "", teacherComment: "", score: "" }
+    item || { title: "", studentWork: "", teacherComment: "", commentHtml: "", score: "" }
+  );
+  const [mode, setMode] = useState<"form" | "html" | "image">(
+    isImageHtml(item?.commentHtml) ? "image" : item?.commentHtml ? "html" : "form"
   );
   const [saving, setSaving] = useState(false);
   const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));
-
   async function handleSubmit() {
     if (!isReview && !form.title?.trim()) { alert("Vui lòng nhập tiêu đề"); return; }
-    setSaving(true);
-    await onSave({
+    // Chỉ giữ nội dung của chế độ đang dùng — tránh 2 kiểu nhận xét cùng tồn tại
+    const payload: any = {
       ...form,
       score: form.score === "" || form.score == null ? null : Number(form.score),
-    });
+    };
+    if (mode === "form") {
+      payload.commentHtml = null;
+    } else {
+      if (!String(payload.commentHtml || "").trim()) {
+        alert(mode === "image" ? "Chưa chọn ảnh nhận xét" : "Chưa dán mã HTML nhận xét");
+        return;
+      }
+      payload.teacherComment = "";
+    }
+    setSaving(true);
+    await onSave(payload);
     setSaving(false);
   }
-
+  const ModeBtn = ({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) => (
+    <button type="button" onClick={onClick}
+      className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${active ? "border-royal bg-royal text-white" : "border-silver/40 text-muted"}`}>{label}</button>
+  );
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 px-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-xl font-bold text-royal">
             {isReview ? "Chấm bài / Sửa nhận xét" : `Tạo nhận xét cho ${studentName}`}
           </h3>
           <button onClick={onClose} className="text-muted hover:text-royal"><X size={20} /></button>
         </div>
-
         <div className="space-y-3">
           {/* Tiêu đề — chỉ khi tạo mới */}
           {!isReview && (
@@ -248,13 +341,11 @@ function FeedbackModal({ item, studentName, onClose, onSave }: {
                 placeholder="VD: Nhận xét Writing Task 2 tuần 3" className="input-field" />
             </div>
           )}
-
           {isReview && (
             <div className="rounded-lg bg-cream p-3">
               <p className="text-xs font-bold text-muted">Bài: <span className="text-royal">{item.title}</span></p>
             </div>
           )}
-
           {/* Bài làm — hiển thị nếu HV đã nộp (review) hoặc cho GV nhập (tạo mới) */}
           {isReview && item.studentWork ? (
             <div>
@@ -268,14 +359,33 @@ function FeedbackModal({ item, studentName, onClose, onSave }: {
                 placeholder="Dán bài làm của HV vào đây (nếu có)" className="input-field resize-y" />
             </div>
           ) : null}
-
-          {/* Nhận xét */}
-          <div>
-            <label className="mb-1 block text-xs font-bold text-muted">Nhận xét của giáo viên</label>
-            <textarea value={form.teacherComment || ""} onChange={(e) => set("teacherComment", e.target.value)} rows={5}
-              placeholder="Nhận xét chi tiết: điểm mạnh, điểm cần cải thiện, gợi ý..." className="input-field resize-y" />
+          {/* Nhận xét — 3 chế độ */}
+          <div className="flex flex-wrap gap-2">
+            <ModeBtn active={mode === "form"} onClick={() => setMode("form")} label="Nhập thường" />
+            <ModeBtn active={mode === "html"} onClick={() => setMode("html")} label="Dán HTML" />
+            <ModeBtn active={mode === "image"} onClick={() => setMode("image")} label="Up ảnh" />
           </div>
-
+          {mode === "form" ? (
+            <div>
+              <label className="mb-1 block text-xs font-bold text-muted">Nhận xét của giáo viên</label>
+              <textarea value={form.teacherComment || ""} onChange={(e) => set("teacherComment", e.target.value)} rows={5}
+                placeholder="Nhận xét chi tiết: điểm mạnh, điểm cần cải thiện, gợi ý..." className="input-field resize-y" />
+            </div>
+          ) : mode === "html" ? (
+            <HtmlPasteBox
+              label="Mã HTML nhận xét"
+              value={form.commentHtml || ""}
+              onChange={(v) => set("commentHtml", v)}
+              hint="Dán cả trang HTML (kể cả <style>) cũng được — học viên thấy đúng giao diện này. Chỉ học viên này xem được."
+            />
+          ) : (
+            <ImageUploadBox
+              label="Ảnh nhận xét"
+              value={form.commentHtml || ""}
+              onChange={(v) => set("commentHtml", v)}
+              hint="Chỉ học viên này xem được ảnh nhận xét của mình."
+            />
+          )}
           {/* Điểm */}
           <div>
             <label className="mb-1 flex items-center gap-1 text-xs font-bold text-muted"><Award size={12} />Điểm (0-10, tuỳ chọn)</label>
@@ -283,7 +393,6 @@ function FeedbackModal({ item, studentName, onClose, onSave }: {
               placeholder="VD: 7.5" className="input-field" />
           </div>
         </div>
-
         <div className="mt-5 flex items-center justify-end gap-3">
           <button onClick={onClose} className="btn-secondary">Huỷ</button>
           <button onClick={handleSubmit} disabled={saving} className="btn-primary">
