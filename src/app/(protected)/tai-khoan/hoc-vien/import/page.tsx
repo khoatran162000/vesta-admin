@@ -148,7 +148,7 @@ export default function ImportStudentsPage() {
             <p className="font-semibold mb-1">Format: 6 cột (đúng thứ tự)</p>
             <p className="text-xs">Họ tên*, Lớp*, Ngày đăng ký*, SĐT, Email, Địa chỉ</p>
             <p className="text-xs mt-1">
-              Mã HV tự sinh theo <b>tên + lớp + ngày</b> (vd <code>lehuongly7+170726</code>). Mật khẩu = <b>SĐT</b>.
+              Mã HV tự sinh theo <b>tên + lớp + ngày</b> (vd <code>lehuongly7240726</code>). Mật khẩu = <b>SĐT</b>.
               Ngày dạng <b>dd/mm/yyyy</b>. Chỉ Họ tên/Lớp/Ngày bắt buộc.
             </p>
           </div>
