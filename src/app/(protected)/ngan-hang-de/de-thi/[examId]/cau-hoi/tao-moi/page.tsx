@@ -1,6 +1,5 @@
 // FILE: src/app/(protected)/ngan-hang-de/de-thi/[examId]/cau-hoi/tao-moi/page.tsx — Them cau hoi (co media)
 "use client";
-
 import { useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Save, Plus, X, ImagePlus, Headphones } from "lucide-react";
@@ -8,7 +7,6 @@ import Link from "next/link";
 import { api, getImageUrl } from "@/lib/api";
 import QuestionContentEditor from "@/components/exam/QuestionContentEditor";
 import { useRequireAdmin } from "@/hooks/useRequireAdmin";
-
 export default function CreateQuestionPage() {
   useRequireAdmin("/ngan-hang-de/de-thi");
   const params = useParams();
@@ -27,24 +25,19 @@ export default function CreateQuestionPage() {
   const [error, setError] = useState("");
   const [addAnother, setAddAnother] = useState(true);
   const mediaInputRef = useRef<HTMLInputElement>(null);
-
   function updateOption(i: number, val: string) { const o = [...options]; o[i] = val; setOptions(o); }
   function addOption() { setOptions([...options, ""]); }
   function removeOption(i: number) { setOptions(options.filter((_, idx) => idx !== i)); }
-
   // Upload media (image or audio)
   async function handleMediaUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
     // Detect type
     const isAudio = file.type.startsWith("audio/");
     const isImage = file.type.startsWith("image/");
     if (!isAudio && !isImage) { setError("Chỉ hỗ trợ file ảnh hoặc audio"); return; }
-
     const formData = new FormData();
     formData.append("thumbnail", file);
-
     try {
       const data = await api.post("/posts/upload-image", formData);
       if (data.success) {
@@ -55,11 +48,17 @@ export default function CreateQuestionPage() {
     } catch { setError("Lỗi upload media"); }
     e.target.value = "";
   }
-
   function removeMedia() { setMediaUrl(""); setMediaPreview(""); setMediaType("none"); }
-
   async function handleSave() {
     if (!content) return;
+    // Chặn sớm: thiếu đáp án thì báo rõ, đừng để backend trả lỗi chung
+    if (type === "MULTIPLE_CHOICE") {
+      const validOptions = options.filter(Boolean);
+      if (validOptions.length < 2) { setError("Cần ít nhất 2 đáp án cho câu trắc nghiệm"); return; }
+      if (!String(correctAnswer ?? "").trim()) { setError("Chọn radio để đánh dấu đáp án đúng"); return; }
+    } else if (type !== "ESSAY") {
+      if (!String(correctAnswer ?? "").trim()) { setError("Vui lòng nhập đáp án đúng"); return; }
+    }
     setSaving(true); setError("");
     try {
       const body: any = { examId, type, content, explanation, score: parseFloat(score), mediaUrl: mediaUrl || null };
@@ -67,7 +66,6 @@ export default function CreateQuestionPage() {
       else if (type === "FILL_IN_BLANK") { body.correctAnswer = correctAnswer; }
       else if (type === "ESSAY") { body.correctAnswer = { type: "manual" }; }
       else { body.correctAnswer = correctAnswer; }
-
       const data = await api.post("/questions", body);
       if (data.success) {
         if (addAnother) {
@@ -77,16 +75,13 @@ export default function CreateQuestionPage() {
       } else { setError(data.message); }
     } catch { setError("Lỗi server"); } finally { setSaving(false); }
   }
-
   return (
     <div className="mx-auto max-w-[800px]">
       <div className="mb-6 flex items-center gap-3">
         <Link href={`/ngan-hang-de/de-thi/${examId}/cau-hoi`} className="rounded-lg p-2 text-muted hover:bg-cream-dark hover:text-royal"><ArrowLeft size={20} /></Link>
         <h2 className="font-display text-2xl font-bold text-royal">Thêm câu hỏi</h2>
       </div>
-
       {error && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
-
       <div className="space-y-5">
         {/* Type + Score */}
         <div className="card grid grid-cols-2 gap-4">
@@ -104,14 +99,11 @@ export default function CreateQuestionPage() {
             <input type="number" value={score} onChange={(e) => setScore(e.target.value)} className="input-field" step="0.5" />
           </div>
         </div>
-
         {/* Content */}
         <QuestionContentEditor value={content} onChange={setContent} />
-
         {/* Media upload (audio/image) */}
         <div className="card">
           <label className="mb-2 block text-sm font-medium text-royal">File đính kèm (ảnh hoặc audio — tuỳ chọn)</label>
-
           {mediaUrl ? (
             <div className="relative">
               {mediaType === "image" && mediaPreview && (
@@ -146,7 +138,6 @@ export default function CreateQuestionPage() {
           <input ref={mediaInputRef} type="file" className="hidden" onChange={handleMediaUpload} />
           <p className="mt-2 text-xs text-muted">Ảnh cho bài Writing/Reading · Audio cho bài Listening</p>
         </div>
-
         {/* Options — MC */}
         {type === "MULTIPLE_CHOICE" && (
           <div className="card space-y-3">
@@ -164,7 +155,6 @@ export default function CreateQuestionPage() {
             <p className="text-xs text-muted">Chọn radio để đánh dấu đáp án đúng</p>
           </div>
         )}
-
         {/* Fill in blank */}
         {type === "FILL_IN_BLANK" && (
           <div className="card">
@@ -173,15 +163,19 @@ export default function CreateQuestionPage() {
             <p className="mt-1 text-xs text-muted">Nhiều đáp án cách nhau bằng dấu | (ví dụ: has been|has already been)</p>
           </div>
         )}
-
+        {/* Matching */}
+        {type === "MATCHING" && (
+          <div className="card">
+            <label className="mb-1 block text-sm font-medium text-royal">Đáp án đúng</label>
+            <input value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)} placeholder="Nhập đáp án đúng..." className="input-field" />
+          </div>
+        )}
         {type === "ESSAY" && <div className="card"><p className="text-sm text-muted">Câu tự luận sẽ được giáo viên chấm thủ công.</p></div>}
-
         {/* Explanation */}
         <div className="card">
           <label className="mb-1 block text-sm font-medium text-royal">Giải thích (tuỳ chọn)</label>
           <textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} rows={2} placeholder="Giải thích đáp án đúng..." className="input-field" />
         </div>
-
         {/* Actions */}
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-2 text-sm text-muted">
