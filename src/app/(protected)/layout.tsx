@@ -4,21 +4,18 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, BookOpen, GraduationCap, Bell, UserCircle,
-  LogOut, ChevronDown, Calendar, FileText, Target, BarChart3, ShieldAlert
+  LogOut, ChevronDown, Calendar, FileText, Target, BarChart3, ShieldAlert, MessageSquare
 } from "lucide-react";
 import { useAuth, ROLE_LABELS } from "@/hooks/useAuth";
-
 // Nhóm quyền — khớp với backend (authorize ở routes). Đây CHỈ là lớp giao diện;
 // chặn thật nằm ở server, ẩn menu chỉ để GV không bấm vào chỗ 403.
 const ADMIN = ["ADMIN"];
 const STAFF = ["ADMIN", "TEACHER"];
 const CMS = ["ADMIN", "CONTENT_CREATOR"];   // giống cmsRoles bên post.routes
-
 type NavChild = { href: string; label: string; roles?: string[] };
 type NavLink = { href: string; label: string; icon: any; roles?: string[] };
 type NavGroup = { label: string; icon: any; children: NavChild[]; roles?: string[] };
 type NavItem = NavLink | NavGroup;
-
 // Không khai `roles` = mọi vai đăng nhập được admin portal đều thấy
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -52,24 +49,21 @@ const NAV: NavItem[] = [
     { href: "/bao-cao/dinh-ky", label: "Báo cáo định kỳ" },
     { href: "/bao-cao/cuoi-khoa", label: "Báo cáo cuối khóa" },
   ] },
+  { href: "/tu-van", label: "Yêu cầu tư vấn", icon: MessageSquare, roles: ADMIN },
   { href: "/thong-bao", label: "Thông báo", icon: Bell, roles: STAFF },
   { href: "/ho-so", label: "Hồ sơ", icon: UserCircle },
 ];
-
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const pathname = usePathname() || "";
   const router = useRouter();
   const [openMenus, setOpenMenus] = useState<string[]>([]);
-
   useEffect(() => {
     if (!loading && !user) router.replace("/dang-nhap");
   }, [loading, user, router]);
-
   function toggleMenu(label: string) {
     setOpenMenus((prev) => prev.includes(label) ? prev.filter((m) => m !== label) : [...prev, label]);
   }
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-cream">
@@ -78,7 +72,6 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     );
   }
   if (!user) return null;
-
   // Lọc menu theo vai: bỏ mục không có quyền, bỏ luôn nhóm nếu rỗng
   const can = (roles?: string[]) => !roles || roles.includes(user.role);
   const navForRole: NavItem[] = NAV
@@ -89,7 +82,6 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       return { ...group, children: group.children.filter((c) => can(c.roles)) };
     })
     .filter((item) => "href" in item || (item as NavGroup).children.length > 0);
-
   return (
     <div className="flex min-h-screen bg-cream">
       <aside className="sticky top-0 flex h-screen w-[240px] shrink-0 flex-col border-r border-silver/30 bg-white">
