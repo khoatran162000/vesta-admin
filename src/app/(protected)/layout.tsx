@@ -6,14 +6,15 @@ import {
   LayoutDashboard, Users, BookOpen, GraduationCap, Bell, UserCircle,
   LogOut, ChevronDown, Calendar, FileText, Target, BarChart3, ShieldAlert, MessageSquare
 } from "lucide-react";
+import { api } from "@/lib/api";
 import { useAuth, ROLE_LABELS } from "@/hooks/useAuth";
-// Nhóm quyền — khớp với backend (authorize ở routes). Đây CHỈ là lớp giao diện;
+// Nhóm quyền — khớp với backend (authorize ở routes). Đây CHỉ là lớp giao diện;
 // chặn thật nằm ở server, ẩn menu chỉ để GV không bấm vào chỗ 403.
 const ADMIN = ["ADMIN"];
 const STAFF = ["ADMIN", "TEACHER"];
 const CMS = ["ADMIN", "CONTENT_CREATOR"];   // giống cmsRoles bên post.routes
 type NavChild = { href: string; label: string; roles?: string[] };
-type NavLink = { href: string; label: string; icon: any; roles?: string[] };
+type NavLink = { href: string; label: string; icon: any; roles?: string[]; badgeKey?: string };
 type NavGroup = { label: string; icon: any; children: NavChild[]; roles?: string[] };
 type NavItem = NavLink | NavGroup;
 // Không khai `roles` = mọi vai đăng nhập được admin portal đều thấy
@@ -49,7 +50,7 @@ const NAV: NavItem[] = [
     { href: "/bao-cao/dinh-ky", label: "Báo cáo định kỳ" },
     { href: "/bao-cao/cuoi-khoa", label: "Báo cáo cuối khóa" },
   ] },
-  { href: "/tu-van", label: "Yêu cầu tư vấn", icon: MessageSquare, roles: ADMIN },
+  { href: "/tu-van", label: "Yêu cầu tư vấn", icon: MessageSquare, roles: ADMIN, badgeKey: "consultation" },
   { href: "/thong-bao", label: "Thông báo", icon: Bell, roles: STAFF },
   { href: "/ho-so", label: "Hồ sơ", icon: UserCircle },
 ];
@@ -58,9 +59,25 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const pathname = usePathname() || "";
   const router = useRouter();
   const [openMenus, setOpenMenus] = useState<string[]>([]);
+  const [consultCount, setConsultCount] = useState(0);
   useEffect(() => {
     if (!loading && !user) router.replace("/dang-nhap");
   }, [loading, user, router]);
+  // Đếm yêu cầu tư vấn MỚI (chỉ ADMIN) — poll mỗi 60s để badge tự cập nhật.
+  // Cập nhật lại ngay khi chuyển route (vd vừa xử lý xong ở trang /tu-van rồi rời đi).
+  useEffect(() => {
+    if (loading || user?.role !== "ADMIN") return;
+    let alive = true;
+    async function loadCount() {
+      try {
+        const res = await api.get("/consultation/count");
+        if (alive && res.success) setConsultCount(res.data.newCount || 0);
+      } catch {}
+    }
+    loadCount();
+    const t = setInterval(loadCount, 60000);
+    return () => { alive = false; clearInterval(t); };
+  }, [loading, user, pathname]);
   function toggleMenu(label: string) {
     setOpenMenus((prev) => prev.includes(label) ? prev.filter((m) => m !== label) : [...prev, label]);
   }
@@ -82,6 +99,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       return { ...group, children: group.children.filter((c) => can(c.roles)) };
     })
     .filter((item) => "href" in item || (item as NavGroup).children.length > 0);
+  // Số badge theo key
+  const badgeFor = (key?: string) => (key === "consultation" ? consultCount : 0);
   return (
     <div className="flex min-h-screen bg-cream">
       <aside className="sticky top-0 flex h-screen w-[240px] shrink-0 flex-col border-r border-silver/30 bg-white">
@@ -103,10 +122,17 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             if ("href" in item) {
               const link = item as NavLink;
               const active = pathname === link.href || pathname.startsWith(link.href + "/");
+              const badge = badgeFor(link.badgeKey);
               return (
                 <Link key={link.href} href={link.href}
                   className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-[0.82rem] font-medium transition-colors ${active ? "bg-royal/8 text-royal" : "text-muted hover:bg-cream hover:text-royal"}`}>
-                  <link.icon size={17} />{link.label}
+                  <link.icon size={17} />
+                  <span className="flex-1">{link.label}</span>
+                  {badge > 0 && (
+                    <span className="ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[0.65rem] font-bold text-white">
+                      {badge > 99 ? "99+" : badge}
+                    </span>
+                  )}
                 </Link>
               );
             }
