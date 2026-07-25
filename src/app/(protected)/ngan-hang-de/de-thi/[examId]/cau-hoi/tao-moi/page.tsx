@@ -6,7 +6,9 @@ import { ArrowLeft, Save, Plus, X, ImagePlus, Headphones } from "lucide-react";
 import Link from "next/link";
 import { api, getImageUrl } from "@/lib/api";
 import QuestionContentEditor from "@/components/exam/QuestionContentEditor";
+import HtmlGapEditor, { GapData } from "@/components/exercise/HtmlGapEditor";
 import { useRequireAdmin } from "@/hooks/useRequireAdmin";
+
 export default function CreateQuestionPage() {
   useRequireAdmin("/ngan-hang-de/de-thi");
   const params = useParams();
@@ -24,10 +26,19 @@ export default function CreateQuestionPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [addAnother, setAddAnother] = useState(true);
+  // FILL_IN_BLANK: "single" = 1 ô như cũ | "multi" = nhiều gap (dán HTML LearnClick)
+  const [fillMode, setFillMode] = useState<"single" | "multi">("single");
+  const [gapData, setGapData] = useState<GapData>({ content: "", gaps: {} });
   const mediaInputRef = useRef<HTMLInputElement>(null);
+
   function updateOption(i: number, val: string) { const o = [...options]; o[i] = val; setOptions(o); }
   function addOption() { setOptions([...options, ""]); }
   function removeOption(i: number) { setOptions(options.filter((_, idx) => idx !== i)); }
+
+  // Câu FILL nhiều gap đang bật?
+  const isMultiGap = type === "FILL_IN_BLANK" && fillMode === "multi";
+  const gapCount = Object.keys(gapData.gaps || {}).length;
+
   // Upload media (image or audio)
   async function handleMediaUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -49,21 +60,31 @@ export default function CreateQuestionPage() {
     e.target.value = "";
   }
   function removeMedia() { setMediaUrl(""); setMediaPreview(""); setMediaType("none"); }
+
   async function handleSave() {
-    if (!content) return;
+    // Câu nhiều gap: nội dung lấy từ HtmlGapEditor; câu thường lấy từ QuestionContentEditor
+    const finalContent = isMultiGap ? gapData.content : content;
+    if (!finalContent) { setError(isMultiGap ? "Chưa có nội dung bài (dán HTML hoặc tạo chỗ trống)" : "Vui lòng nhập nội dung câu hỏi"); return; }
+
     // Chặn sớm: thiếu đáp án thì báo rõ, đừng để backend trả lỗi chung
     if (type === "MULTIPLE_CHOICE") {
       const validOptions = options.filter(Boolean);
       if (validOptions.length < 2) { setError("Cần ít nhất 2 đáp án cho câu trắc nghiệm"); return; }
       if (!String(correctAnswer ?? "").trim()) { setError("Chọn radio để đánh dấu đáp án đúng"); return; }
+    } else if (isMultiGap) {
+      if (gapCount < 1) { setError("Bài chưa có chỗ trống nào — bôi đen + ⌘G hoặc dán HTML LearnClick"); return; }
     } else if (type !== "ESSAY") {
       if (!String(correctAnswer ?? "").trim()) { setError("Vui lòng nhập đáp án đúng"); return; }
     }
+
     setSaving(true); setError("");
     try {
-      const body: any = { examId, type, content, explanation, score: parseFloat(score), mediaUrl: mediaUrl || null };
+      const body: any = { examId, type, content: finalContent, explanation, score: parseFloat(score), mediaUrl: mediaUrl || null };
       if (type === "MULTIPLE_CHOICE") { body.options = options.filter(Boolean); body.correctAnswer = correctAnswer; }
-      else if (type === "FILL_IN_BLANK") { body.correctAnswer = correctAnswer; }
+      else if (type === "FILL_IN_BLANK") {
+        if (isMultiGap) { body.gaps = gapData.gaps; body.correctAnswer = {}; }  // đáp án nằm trong gaps
+        else { body.correctAnswer = correctAnswer; }
+      }
       else if (type === "ESSAY") { body.correctAnswer = { type: "manual" }; }
       else { body.correctAnswer = correctAnswer; }
       const data = await api.post("/questions", body);
@@ -71,10 +92,12 @@ export default function CreateQuestionPage() {
         if (addAnother) {
           setContent(""); setOptions(["", "", "", ""]); setCorrectAnswer(""); setExplanation("");
           setMediaUrl(""); setMediaPreview(""); setMediaType("none");
+          setGapData({ content: "", gaps: {} });
         } else { router.push(`/ngan-hang-de/de-thi/${examId}/cau-hoi`); }
       } else { setError(data.message); }
     } catch { setError("Lỗi server"); } finally { setSaving(false); }
   }
+
   return (
     <div className="mx-auto max-w-[800px]">
       <div className="mb-6 flex items-center gap-3">
@@ -99,8 +122,39 @@ export default function CreateQuestionPage() {
             <input type="number" value={score} onChange={(e) => setScore(e.target.value)} className="input-field" step="0.5" />
           </div>
         </div>
-        {/* Content */}
-        <QuestionContentEditor value={content} onChange={setContent} />
+
+        {/* Chọn chế độ cho FILL_IN_BLANK */}
+        {type === "FILL_IN_BLANK" && (
+          <div className="card">
+            <label className="mb-2 block text-sm font-medium text-royal">Kiểu điền từ</label>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setFillMode("single")}
+                className={`flex-1 rounded-lg border-2 px-3 py-2 text-sm font-medium transition-colors ${fillMode === "single" ? "border-gold bg-gold/10 text-royal" : "border-silver/40 text-muted hover:border-gold/40"}`}>
+                1 ô đơn giản
+              </button>
+              <button type="button" onClick={() => setFillMode("multi")}
+                className={`flex-1 rounded-lg border-2 px-3 py-2 text-sm font-medium transition-colors ${fillMode === "multi" ? "border-gold bg-gold/10 text-royal" : "border-silver/40 text-muted hover:border-gold/40"}`}>
+                Nhiều chỗ trống / dán HTML LearnClick
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-muted">
+              {fillMode === "single"
+                ? "Một chỗ trống, một ô đáp án (nhiều cách viết ngăn bằng |)."
+                : "Nhiều chỗ trống trong một đoạn — dán HTML từ LearnClick hoặc tự bôi đen tạo chỗ trống. Chấm điểm theo từng ô."}
+            </p>
+          </div>
+        )}
+
+        {/* Content — câu thường dùng QuestionContentEditor; câu nhiều gap dùng HtmlGapEditor */}
+        {isMultiGap ? (
+          <div className="card">
+            <label className="mb-2 block text-sm font-medium text-royal">Nội dung bài (chỗ trống)</label>
+            <HtmlGapEditor initial={gapData} onChange={setGapData} />
+          </div>
+        ) : (
+          <QuestionContentEditor value={content} onChange={setContent} />
+        )}
+
         {/* Media upload (audio/image) */}
         <div className="card">
           <label className="mb-2 block text-sm font-medium text-royal">File đính kèm (ảnh hoặc audio — tuỳ chọn)</label>
@@ -138,6 +192,7 @@ export default function CreateQuestionPage() {
           <input ref={mediaInputRef} type="file" className="hidden" onChange={handleMediaUpload} />
           <p className="mt-2 text-xs text-muted">Ảnh cho bài Writing/Reading · Audio cho bài Listening</p>
         </div>
+
         {/* Options — MC */}
         {type === "MULTIPLE_CHOICE" && (
           <div className="card space-y-3">
@@ -155,14 +210,16 @@ export default function CreateQuestionPage() {
             <p className="text-xs text-muted">Chọn radio để đánh dấu đáp án đúng</p>
           </div>
         )}
-        {/* Fill in blank */}
-        {type === "FILL_IN_BLANK" && (
+
+        {/* Fill in blank — chỉ hiện ô đáp án khi là chế độ 1 ô */}
+        {type === "FILL_IN_BLANK" && fillMode === "single" && (
           <div className="card">
             <label className="mb-1 block text-sm font-medium text-royal">Đáp án đúng</label>
             <input value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)} placeholder="Nhập đáp án đúng..." className="input-field" />
             <p className="mt-1 text-xs text-muted">Nhiều đáp án cách nhau bằng dấu | (ví dụ: has been|has already been)</p>
           </div>
         )}
+
         {/* Matching */}
         {type === "MATCHING" && (
           <div className="card">
@@ -170,19 +227,22 @@ export default function CreateQuestionPage() {
             <input value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)} placeholder="Nhập đáp án đúng..." className="input-field" />
           </div>
         )}
+
         {type === "ESSAY" && <div className="card"><p className="text-sm text-muted">Câu tự luận sẽ được giáo viên chấm thủ công.</p></div>}
+
         {/* Explanation */}
         <div className="card">
           <label className="mb-1 block text-sm font-medium text-royal">Giải thích (tuỳ chọn)</label>
           <textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} rows={2} placeholder="Giải thích đáp án đúng..." className="input-field" />
         </div>
+
         {/* Actions */}
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-2 text-sm text-muted">
             <input type="checkbox" checked={addAnother} onChange={(e) => setAddAnother(e.target.checked)} className="h-4 w-4 rounded accent-gold" />
             Thêm câu hỏi tiếp
           </label>
-          <button onClick={handleSave} disabled={saving || !content} className="btn-primary"><Save size={15} />{saving ? "Đang lưu..." : "Lưu câu hỏi"}</button>
+          <button onClick={handleSave} disabled={saving} className="btn-primary"><Save size={15} />{saving ? "Đang lưu..." : "Lưu câu hỏi"}</button>
         </div>
       </div>
     </div>
