@@ -20,6 +20,7 @@ export function StudentList() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [includeHidden, setIncludeHidden] = useState(false);
   const [classModal, setClassModal] = useState<Student | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -40,19 +41,19 @@ export function StudentList() {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ role: "STUDENT", page: String(page), limit: "20" });
+      const params = new URLSearchParams({ role: "STUDENT", page: String(page), limit: String(pageSize) });
       if (search) params.set("search", search);
       if (includeHidden) params.set("includeHidden", "1");
       const data = await api.get(`/users?${params}`);
       if (data.success) { setUsers(data.data); setTotal(data.meta.total); }
     } catch {} finally { setLoading(false); }
-  }, [page, search, includeHidden]);
+  }, [page, search, includeHidden, pageSize]);
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
   useEffect(() => {
     const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 400);
     return () => clearTimeout(t);
   }, [searchInput]);
-  useEffect(() => { setSelected(new Set()); }, [page, search, includeHidden]);
+  useEffect(() => { setSelected(new Set()); }, [page, search, includeHidden, pageSize]);
   // Nạp danh sách lớp khi mở form tạo HV (để chọn xếp lớp luôn)
   useEffect(() => {
     if (showCreate && classes.length === 0) {
@@ -203,10 +204,18 @@ export function StudentList() {
           <button onClick={() => setShowCreate(true)} className="btn-primary"><Plus size={15} />Tạo tài khoản</button>
         </div>
       </div>
-      <div className="relative mb-5">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-        <input type="text" value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Tìm theo tên, mã HV, SĐT..." className="input-field pl-9" />
+      <div className="mb-5 flex items-center gap-3">
+        <div className="relative flex-1">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <input type="text" value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Tìm theo tên, mã HV, SĐT..." className="input-field pl-9" />
+        </div>
+        <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+          className="input-field w-auto" title="Số học viên mỗi trang">
+          <option value={20}>20 / trang</option>
+          <option value={50}>50 / trang</option>
+          <option value={100}>100 / trang</option>
+        </select>
       </div>
       {selected.size > 0 && (
         <div className="mb-4 flex items-center justify-between rounded-xl border border-gold/30 bg-gold/5 px-4 py-3">
@@ -305,11 +314,11 @@ export function StudentList() {
         )}
         {!loading && users.length === 0 && <p className="py-12 text-center text-muted">Chưa có học viên nào.</p>}
       </div>
-      {total > 20 && (
+      {total > pageSize && (
         <div className="mt-4 flex justify-center gap-2">
           <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="btn-secondary text-xs disabled:opacity-40">← Trước</button>
-          <span className="px-3 py-1.5 text-sm text-muted">Trang {page}</span>
-          <button onClick={() => setPage((p) => p + 1)} disabled={users.length < 20} className="btn-secondary text-xs disabled:opacity-40">Sau →</button>
+          <span className="px-3 py-1.5 text-sm text-muted">Trang {page} · {total} HV</span>
+          <button onClick={() => setPage((p) => p + 1)} disabled={users.length < pageSize} className="btn-secondary text-xs disabled:opacity-40">Sau →</button>
         </div>
       )}
       {showCreate && (
@@ -373,7 +382,6 @@ export function StudentList() {
     </div>
   );
 }
-
 function StudentClassModal({ student, onClose }: { student: any; onClose: () => void }) {
   const [myClasses, setMyClasses] = useState<any[]>([]);
   const [allClasses, setAllClasses] = useState<any[]>([]);
@@ -450,7 +458,6 @@ function StudentClassModal({ student, onClose }: { student: any; onClose: () => 
     </div>
   );
 }
-
 function BulkAddClassModal({ studentIds, onClose, onDone }: { studentIds: string[]; onClose: () => void; onDone: () => void }) {
   const [allClasses, setAllClasses] = useState<any[]>([]);
   const [addId, setAddId] = useState("");
