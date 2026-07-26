@@ -466,7 +466,7 @@ function SessionDiaryPanel({ classId, cls }: { classId: string; cls: any }) {
     if (!file) return;
     setUploadingImg(true);
     const fd = new FormData();
-    fd.append("thumbnail", file);
+    fd.append("image", file);
     try {
       const res = await api.post("/posts/upload-image", fd);
       if (res.success) setImageUrl(res.data.url);

@@ -146,7 +146,7 @@ export default function HtmlGapEditor({ initial, onChange }: Props) {
     setUploadingImg(true);
     try {
       const fd = new FormData();
-      fd.append("thumbnail", file);
+      fd.append("image", file);
       const res = await api.post("/posts/upload-image", fd);
       if (!res.success) { alert(res.message || "Lỗi upload ảnh"); return; }
       const url = getImageUrl(res.data.url);
