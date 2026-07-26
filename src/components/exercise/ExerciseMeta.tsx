@@ -69,8 +69,10 @@ export default function ExerciseMeta({ meta, onChange }: Props) {
         </div>
         <div>
           <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Số lượt được chấm điểm</label>
-          <input type="number" min="1" value={meta.maxAttempts} onChange={(e) => set("maxAttempts", e.target.value)}
-            placeholder="Để trống = không giới hạn" className="input-field" />
+          <select value={meta.maxAttempts} onChange={(e) => set("maxAttempts", e.target.value)} className="input-field">
+            <option value="">Không giới hạn</option>
+            {[1,2,3,4,5,6,7,8,9].map((n) => <option key={n} value={n}>{n} lần</option>)}
+          </select>
         </div>
       </div>
       <p className="rounded-lg bg-blue-50 px-3 py-2 text-[0.7rem] text-blue-700">

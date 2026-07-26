@@ -40,7 +40,7 @@ export default function CreateExamPage() {
         <div className="grid grid-cols-3 gap-4">
           <div><label className="mb-1 block text-sm font-medium text-royal">Thời gian (phút) *</label><input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} className="input-field" /></div>
           <div><label className="mb-1 block text-sm font-medium text-royal">Tổng điểm *</label><input type="number" value={totalScore} onChange={(e) => setTotalScore(e.target.value)} className="input-field" /></div>
-          <div><label className="mb-1 block text-sm font-medium text-royal">Số lượt chấm</label><input type="number" min="1" value={maxAttempts} onChange={(e) => setMaxAttempts(e.target.value)} placeholder="Trống = ∞" className="input-field" /></div>
+          <div><label className="mb-1 block text-sm font-medium text-royal">Số lượt chấm</label><select value={maxAttempts} onChange={(e) => setMaxAttempts(e.target.value)} className="input-field"><option value="">Không giới hạn</option>{[1,2,3,4,5,6,7,8,9].map((n) => <option key={n} value={n}>{n} lần</option>)}</select></div>
         </div>
         <p className="rounded-lg bg-blue-50 px-3 py-2 text-[0.7rem] text-blue-700">Vượt số lượt chấm, học viên vẫn làm lại được nhưng tính là <strong>lượt ôn tập</strong> (không cộng vào điểm chính thức).</p>
         <button onClick={handleSave} disabled={saving || !title || !categoryId} className="btn-primary"><Save size={15} />{saving ? "Đang lưu..." : "Tạo đề thi & thêm câu hỏi →"}</button>

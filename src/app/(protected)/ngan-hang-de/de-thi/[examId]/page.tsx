@@ -60,7 +60,7 @@ export default function EditExamPage() {
           <div><label className="mb-1 block text-sm font-medium text-royal">Tổng điểm</label><input type="number" value={totalScore} onChange={(e) => setTotalScore(e.target.value)} className="input-field" /></div>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <div><label className="mb-1 block text-sm font-medium text-royal">Số lượt chấm điểm</label><input type="number" min="1" value={maxAttempts} onChange={(e) => setMaxAttempts(e.target.value)} placeholder="Trống = không giới hạn" className="input-field" /></div>
+          <div><label className="mb-1 block text-sm font-medium text-royal">Số lượt chấm điểm</label><select value={maxAttempts} onChange={(e) => setMaxAttempts(e.target.value)} className="input-field"><option value="">Không giới hạn</option>{[1,2,3,4,5,6,7,8,9].map((n) => <option key={n} value={n}>{n} lần</option>)}</select></div>
           <div><label className="mb-1 block text-sm font-medium text-royal">Trạng thái</label><select value={status} onChange={(e) => setStatus(e.target.value)} className="input-field"><option value="DRAFT">Draft</option><option value="PUBLISHED">Published</option></select></div>
         </div>
         <div className="flex items-center justify-between">
