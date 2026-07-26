@@ -1,4 +1,4 @@
-// FILE: src/app/(protected)/lop-hoc-moi/[id]/page.tsx — Chi tiết lớp + ghi danh + điểm danh + nhật ký buổi (xuất PNG) + chuyển lớp
+// FILE: src/app/(protected)/lop-hoc-moi/[id]/page.tsx — Chi tiết lớp + ghi danh (tìm server-side) + điểm danh + nhật ký buổi (xuất PNG) + chuyển lớp
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
@@ -31,6 +31,7 @@ export default function ClassDetailPage() {
   const [allStudents, setAllStudents] = useState<any[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
+  const [searching, setSearching] = useState(false);
   const [tab, setTab] = useState<"students" | "attendance" | "diary">("students");
   const [transferStudent, setTransferStudent] = useState<any>(null); // HS đang chuyển lớp
   const load = useCallback(async () => {
@@ -40,23 +41,28 @@ export default function ClassDetailPage() {
     setLoading(false);
   }, [classId]);
   useEffect(() => { load(); }, [load]);
-  async function openAdd() {
+  function openAdd() {
     setPicked(new Set()); setQ(""); setAddOpen(true);
-    if (allStudents.length === 0) {
-      const data = await api.get("/users?role=STUDENT&limit=1000");
+  }
+  // Tìm HS server-side (debounce). Tìm được HS ngoài top 100, dù trung tâm có bao nhiêu HS.
+  useEffect(() => {
+    if (!addOpen) return;
+    const t = setTimeout(async () => {
+      setSearching(true);
+      const qs = new URLSearchParams({ role: "STUDENT", limit: "100" });
+      if (q.trim()) qs.set("search", q.trim());
+      const data = await api.get(`/users?${qs}`);
       if (data.success) {
         const list = Array.isArray(data.data) ? data.data : (data.data?.users || data.data?.items || []);
         setAllStudents(list);
       }
-    }
-  }
+      setSearching(false);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [q, addOpen]);
   const enrolledIds = new Set((cls?.enrollments || []).map((e: any) => e.student.id));
-  const filtered = allStudents.filter((s) => {
-    if (enrolledIds.has(s.id)) return false;
-    if (!q.trim()) return true;
-    const t = q.toLowerCase();
-    return (s.fullName || "").toLowerCase().includes(t) || (s.studentCode || "").toLowerCase().includes(t);
-  });
+  // Server đã lọc theo search; ở client chỉ ẩn HS đã trong lớp
+  const filtered = allStudents.filter((s) => !enrolledIds.has(s.id));
   function togglePick(sid: string) {
     setPicked((prev) => { const n = new Set(prev); n.has(sid) ? n.delete(sid) : n.add(sid); return n; });
   }
@@ -175,8 +181,9 @@ export default function ClassDetailPage() {
             </div>
             <div className="relative mb-3">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm theo tên / mã HV..."
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm theo tên / mã HV / SĐT..."
                 className="input-field pl-9" />
+              {searching && <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gold" />}
             </div>
             {filtered.length > 0 && (
               <label className="mb-2 flex cursor-pointer items-center gap-3 rounded-lg bg-cream px-3 py-2 hover:bg-cream-dark">
@@ -190,7 +197,9 @@ export default function ClassDetailPage() {
             )}
             <div className="mb-3 flex-1 overflow-y-auto rounded-lg border border-silver/30">
               {filtered.length === 0 ? (
-                <div className="py-10 text-center text-sm text-muted">Không có học viên phù hợp (đã trong lớp thì bị ẩn).</div>
+                <div className="py-10 text-center text-sm text-muted">
+                  {q.trim() ? "Không tìm thấy học viên phù hợp." : "Gõ tên / mã HV để tìm học viên."}
+                </div>
               ) : filtered.map((s) => (
                 <label key={s.id} className="flex cursor-pointer items-center gap-3 border-b border-silver/10 px-3 py-2 hover:bg-cream/50">
                   <input type="checkbox" checked={picked.has(s.id)} onChange={() => togglePick(s.id)} className="h-4 w-4" />
