@@ -1,9 +1,9 @@
-// FILE: src/app/(protected)/lop-hoc-moi/[id]/page.tsx — Chi tiết lớp + ghi danh học viên + điểm danh buổi học
+// FILE: src/app/(protected)/lop-hoc-moi/[id]/page.tsx — Chi tiết lớp + ghi danh học viên + điểm danh + nhật ký buổi
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, UserPlus, Trash2, X, Search, ClipboardCheck, Users, Check, Clock, XCircle } from "lucide-react";
+import { ArrowLeft, Loader2, UserPlus, Trash2, X, Search, ClipboardCheck, Users, Check, Clock, XCircle, BookText, Plus, Save } from "lucide-react";
 import { api } from "@/lib/api";
 const ENROLL_STATUS: Record<string, { label: string; cls: string }> = {
   STUDYING: { label: "Đang học", cls: "bg-green-50 text-green-700" },
@@ -33,7 +33,7 @@ export default function ClassDetailPage() {
   const [allStudents, setAllStudents] = useState<any[]>([]);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
-  const [tab, setTab] = useState<"students" | "attendance">("students");
+  const [tab, setTab] = useState<"students" | "attendance" | "diary">("students");
   const load = useCallback(async () => {
     setLoading(true);
     const res = await api.get(`/classes/${classId}`);
@@ -103,7 +103,7 @@ export default function ClassDetailPage() {
           <span>Sĩ số: <b className="text-royal">{enrollments.length}</b></span>
         </div>
       </div>
-      {/* Tab: Danh sách HV / Điểm danh */}
+      {/* Tab: Danh sách HV / Điểm danh / Nhật ký buổi */}
       <div className="mb-5 flex gap-1 rounded-xl border border-silver/30 bg-white p-1">
         <button onClick={() => setTab("students")}
           className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${tab === "students" ? "bg-royal text-white" : "text-muted hover:bg-cream-dark"}`}>
@@ -113,9 +113,15 @@ export default function ClassDetailPage() {
           className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${tab === "attendance" ? "bg-royal text-white" : "text-muted hover:bg-cream-dark"}`}>
           <ClipboardCheck size={16} />Điểm danh buổi học
         </button>
+        <button onClick={() => setTab("diary")}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${tab === "diary" ? "bg-royal text-white" : "text-muted hover:bg-cream-dark"}`}>
+          <BookText size={16} />Nhật ký buổi
+        </button>
       </div>
       {tab === "attendance" ? (
         <AttendancePanel classId={classId} />
+      ) : tab === "diary" ? (
+        <SessionDiaryPanel classId={classId} cls={cls} />
       ) : (
         <>
           <div className="mb-4 flex items-center justify-between">
@@ -378,6 +384,167 @@ function AttendancePanel({ classId }: { classId: string }) {
                 <span className={`ml-1.5 ${s.date === date ? "text-white/80" : "text-green-600"}`}>{s.present + s.late}/{s.present + s.late + s.absent}</span>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+// ═══════════════ NHẬT KÝ BUỔI HỌC ═══════════════
+interface DiaryStudent { name: string; score: string; comment: string }
+function SessionDiaryPanel({ classId, cls }: { classId: string; cls: any }) {
+  const [date, setDate] = useState(todayStr());
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [exists, setExists] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
+  const [diaries, setDiaries] = useState<any[]>([]);
+  // Trường của buổi
+  const [sessionNumber, setSessionNumber] = useState("");
+  const [teacherName, setTeacherName] = useState("");
+  const [assistantName, setAssistantName] = useState("");
+  const [content, setContent] = useState("");
+  const [homework, setHomework] = useState("");
+  const [students, setStudents] = useState<DiaryStudent[]>([]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await api.get(`/session-diary?classId=${classId}&date=${date}`);
+    if (res.success) {
+      const d = res.data;
+      setExists(!!res.exists);
+      setSessionNumber(d.sessionNumber != null ? String(d.sessionNumber) : "");
+      setTeacherName(d.teacherName || d.defaultTeacher || "");
+      setAssistantName(d.assistantName || "");
+      setContent(d.content || "");
+      setHomework(d.homework || "");
+      setStudents(Array.isArray(d.students) ? d.students.map((s: any) => ({ name: s.name || "", score: s.score != null ? String(s.score) : "", comment: s.comment || "" })) : []);
+    }
+    setLoading(false);
+  }, [classId, date]);
+  const loadDiaries = useCallback(async () => {
+    const res = await api.get(`/session-diary/list?classId=${classId}`);
+    if (res.success) setDiaries(res.data || []);
+  }, [classId]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadDiaries(); }, [loadDiaries]);
+
+  function flash(msg: string) { setSavedMsg(msg); setTimeout(() => setSavedMsg(""), 2500); }
+  function setStu(i: number, field: keyof DiaryStudent, value: string) {
+    setStudents((prev) => prev.map((s, idx) => idx === i ? { ...s, [field]: value } : s));
+  }
+  function addStu() { setStudents((prev) => [...prev, { name: "", score: "", comment: "" }]); }
+  function removeStu(i: number) { setStudents((prev) => prev.filter((_, idx) => idx !== i)); }
+
+  async function save() {
+    setSaving(true);
+    const res = await api.post(`/session-diary`, {
+      classId, date,
+      sessionNumber, teacherName, assistantName, content, homework,
+      students: students.filter((s) => s.name.trim() !== ""),
+    });
+    setSaving(false);
+    if (!res.success) { alert(res.message || "Lỗi lưu nhật ký"); return; }
+    setExists(true);
+    flash("Đã lưu nhật ký buổi học");
+    loadDiaries();
+  }
+
+  return (
+    <div>
+      {/* Thanh chọn ngày */}
+      <div className="card mb-4 flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="mb-1.5 block text-xs font-bold text-muted">Buổi học ngày</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input-field !w-auto" />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-bold text-muted">Buổi số</label>
+            <input type="number" min="1" value={sessionNumber} onChange={(e) => setSessionNumber(e.target.value)}
+              placeholder="1" className="input-field !w-24" />
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {savedMsg && <span className="text-xs font-semibold text-green-600">{savedMsg}</span>}
+          {exists && <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">Đã có nhật ký</span>}
+          <button onClick={save} disabled={saving} className="btn-primary"><Save size={15} />{saving ? "Đang lưu..." : "Lưu nhật ký"}</button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-gold" /></div>
+      ) : (
+        <>
+          {/* GV + Trợ giảng */}
+          <div className="card mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-bold text-muted">Giáo viên</label>
+              <input value={teacherName} onChange={(e) => setTeacherName(e.target.value)} placeholder="Tên GV" className="input-field" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-bold text-muted">Trợ giảng</label>
+              <input value={assistantName} onChange={(e) => setAssistantName(e.target.value)} placeholder="Tên trợ giảng" className="input-field" />
+            </div>
+          </div>
+
+          {/* Nội dung học */}
+          <div className="card mb-4">
+            <label className="mb-1.5 block text-xs font-bold text-muted">① Nội dung học</label>
+            <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={3}
+              placeholder="Mỗi dòng = 1 gạch đầu dòng&#10;VD:&#10;Từ vựng chủ đề Cities & Transportation&#10;Kỹ năng nghe: Map labelling" className="input-field" />
+            <p className="mt-1 text-[0.7rem] text-muted">Mỗi dòng = 1 gạch đầu dòng.</p>
+          </div>
+
+          {/* Tình hình lớp — HS/điểm/nhận xét (tự đổ từ điểm danh, sửa được) */}
+          <div className="card mb-4">
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-xs font-bold text-muted">② Tình hình lớp — Học viên · Điểm · Nhận xét</label>
+              <span className="text-[0.7rem] text-muted">{students.length} học viên · tự lấy từ điểm danh, sửa được</span>
+            </div>
+            <div className="space-y-2">
+              {students.map((s, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className="w-5 shrink-0 pt-2 text-center text-sm font-bold text-crimson text-royal">{i + 1}</span>
+                  <input value={s.name} onChange={(e) => setStu(i, "name", e.target.value)} placeholder="Tên học viên"
+                    className="flex-[1.3] rounded-lg border border-silver/40 px-2 py-1.5 text-sm outline-none focus:border-gold" />
+                  <input value={s.score} onChange={(e) => setStu(i, "score", e.target.value)} placeholder="Điểm"
+                    className="w-16 shrink-0 rounded-lg border border-silver/40 px-2 py-1.5 text-sm outline-none focus:border-gold" />
+                  <textarea value={s.comment} onChange={(e) => setStu(i, "comment", e.target.value)} rows={1} placeholder="Nhận xét..."
+                    className="flex-[2] resize-y rounded-lg border border-silver/40 px-2 py-1.5 text-sm outline-none focus:border-gold" />
+                  <button onClick={() => removeStu(i)} title="Xoá"
+                    className="mt-0.5 shrink-0 rounded-lg p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+                </div>
+              ))}
+            </div>
+            <button onClick={addStu} className="mt-3 flex items-center gap-1 text-xs font-medium text-gold hover:text-gold-light"><Plus size={13} />Thêm học viên</button>
+          </div>
+
+          {/* Bài tập về nhà */}
+          <div className="card mb-4">
+            <label className="mb-1.5 block text-xs font-bold text-muted">③ Bài tập về nhà & dặn dò</label>
+            <textarea value={homework} onChange={(e) => setHomework(e.target.value)} rows={3}
+              placeholder="Mỗi dòng = 1 gạch đầu dòng&#10;VD:&#10;Hoàn thành Unit 2 - phần Reading (trang 24-25)&#10;Học thuộc 20 từ vựng chủ đề Transportation" className="input-field" />
+            <p className="mt-1 text-[0.7rem] text-muted">Mỗi dòng = 1 gạch đầu dòng.</p>
+          </div>
+        </>
+      )}
+
+      {/* Các buổi đã ghi nhật ký */}
+      {diaries.length > 0 && (
+        <div className="mt-6">
+          <h4 className="mb-2 text-sm font-bold text-royal">Các buổi đã ghi nhật ký ({diaries.length})</h4>
+          <div className="flex flex-wrap gap-2">
+            {diaries.map((d) => {
+              const key = new Date(d.sessionDate).toISOString().slice(0, 10);
+              return (
+                <button key={d.id} onClick={() => setDate(key)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${key === date ? "border-royal bg-royal text-white" : "border-silver/40 text-muted hover:border-gold/50 hover:text-royal"}`}>
+                  {new Date(d.sessionDate).toLocaleDateString("vi-VN")}
+                  {d.sessionNumber != null && <span className={`ml-1.5 ${key === date ? "text-white/80" : "text-gold-dark"}`}>· B{d.sessionNumber}</span>}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
