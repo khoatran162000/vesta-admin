@@ -472,7 +472,7 @@ function SessionDiaryPanel({ classId, cls }: { classId: string; cls: any }) {
     if (!cardRef.current) return;
     setExporting(true);
     try {
-      const html2canvas = (await import("html2canvas")).default;
+      const html2canvas = (await import("html2canvas-pro")).default;
       const canvas = await html2canvas(cardRef.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
       const link = document.createElement("a");
       link.download = `VESTA_NhatKy_${cls.name || "lop"}_${date}.png`.replace(/\s+/g, "");
