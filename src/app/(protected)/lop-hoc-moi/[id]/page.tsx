@@ -1,9 +1,9 @@
-// FILE: src/app/(protected)/lop-hoc-moi/[id]/page.tsx — Chi tiết lớp + ghi danh + điểm danh + nhật ký buổi (có xuất ảnh PNG)
+// FILE: src/app/(protected)/lop-hoc-moi/[id]/page.tsx — Chi tiết lớp + ghi danh + điểm danh + nhật ký buổi (xuất PNG) + chuyển lớp
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, UserPlus, Trash2, X, Search, ClipboardCheck, Users, Check, Clock, XCircle, BookText, Plus, Save, Download, ImagePlus, Eye } from "lucide-react";
+import { ArrowLeft, Loader2, UserPlus, Trash2, X, Search, ClipboardCheck, Users, Check, Clock, XCircle, BookText, Plus, Save, Download, ImagePlus, Eye, Repeat } from "lucide-react";
 import { api, getImageUrl } from "@/lib/api";
 const ENROLL_STATUS: Record<string, { label: string; cls: string }> = {
   STUDYING: { label: "Đang học", cls: "bg-green-50 text-green-700" },
@@ -32,6 +32,7 @@ export default function ClassDetailPage() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
   const [tab, setTab] = useState<"students" | "attendance" | "diary">("students");
+  const [transferStudent, setTransferStudent] = useState<any>(null); // HS đang chuyển lớp
   const load = useCallback(async () => {
     setLoading(true);
     const res = await api.get(`/classes/${classId}`);
@@ -150,8 +151,12 @@ export default function ClassDetailPage() {
                         </select>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button onClick={() => unenroll(e.student.id)} title="Gỡ khỏi lớp"
-                          className="rounded-lg p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={15} /></button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => setTransferStudent(e.student)} title="Chuyển sang lớp khác"
+                            className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Repeat size={15} /></button>
+                          <button onClick={() => unenroll(e.student.id)} title="Gỡ khỏi lớp"
+                            className="rounded-lg p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={15} /></button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -208,6 +213,15 @@ export default function ClassDetailPage() {
             </div>
           </div>
         </div>
+      )}
+      {/* Modal chuyển sang lớp khác */}
+      {transferStudent && (
+        <TransferClassModal
+          student={transferStudent}
+          currentClassId={classId}
+          onClose={() => setTransferStudent(null)}
+          onDone={() => { setTransferStudent(null); load(); }}
+        />
       )}
     </div>
   );
@@ -563,7 +577,6 @@ function SessionDiaryPanel({ classId, cls }: { classId: string; cls: any }) {
             <p className="mt-1 text-[0.7rem] text-muted">Mỗi dòng = 1 gạch đầu dòng.</p>
           </div>
 
-          {/* Ảnh minh hoạ + Xuất ảnh */}
           <div className="card mb-4">
             <label className="mb-2 block text-xs font-bold text-muted">Ảnh minh hoạ (tuỳ chọn) & Xuất ảnh</label>
             <div className="flex flex-wrap items-center gap-3">
@@ -589,7 +602,6 @@ function SessionDiaryPanel({ classId, cls }: { classId: string; cls: any }) {
             <p className="mt-2 text-[0.7rem] text-muted">Bấm &quot;Xuất ảnh PNG&quot; để tải thẻ nhật ký đẹp gửi phụ huynh. Nên bấm &quot;Lưu nhật ký&quot; trước để không mất dữ liệu.</p>
           </div>
 
-          {/* ───────── THẺ NHẬT KÝ (preview + nguồn để html2canvas chụp) ───────── */}
           {showPreview && (
             <div className="mb-4 overflow-x-auto">
               <DiaryCard
@@ -630,7 +642,7 @@ function SessionDiaryPanel({ classId, cls }: { classId: string; cls: any }) {
     </div>
   );
 }
-// ───────── Thẻ nhật ký (layout theo artifact, dùng inline style để html2canvas chụp chuẩn) ─────────
+// ───────── Thẻ nhật ký (layout theo artifact, inline style để html2canvas chụp chuẩn) ─────────
 function DiaryCard(props: {
   cardRef: React.RefObject<HTMLDivElement | null>;
   className: string; course: string | null;
@@ -640,7 +652,7 @@ function DiaryCard(props: {
   students: DiaryStudent[];
   imageUrl: string;
 }) {
-  const { cardRef, className, course, sessionNumber, dateVN, teacherName, assistantName, contentLines, homeworkLines, students, imageUrl } = props;
+  const { cardRef, className, sessionNumber, dateVN, teacherName, assistantName, contentLines, homeworkLines, students, imageUrl } = props;
   const GOLD = "#C9A84C", GOLD_DARK = "#A6882E", CRIMSON = "#B22234", CRIMSON_DARK = "#8B1A29", BLUE = "#1B2A5B", INK = "#1A1A2E";
   const meta = (k: string, v: string) => (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 14, padding: "4px 0", borderBottom: "1px dashed rgba(166,136,46,.32)" }}>
@@ -656,7 +668,6 @@ function DiaryCard(props: {
   );
   return (
     <div ref={cardRef} style={{ width: 820, background: "#fff", fontFamily: "'Be Vietnam Pro', Arial, sans-serif", color: INK }}>
-      {/* Header */}
       <div style={{ background: "linear-gradient(135deg,#FAF6EE 0%,#F4ECDA 50%,#ECE0C4 100%)", padding: "24px 32px 20px", display: "flex", alignItems: "center", gap: 22, borderBottom: `2px solid ${GOLD}` }}>
         <img src="/logo-vesta-01.jpg" alt="VESTA" crossOrigin="anonymous" style={{ width: 96, height: 96, flex: "none", objectFit: "contain" }} />
         <div style={{ flex: 1 }}>
@@ -672,9 +683,7 @@ function DiaryCard(props: {
           {meta("TG", assistantName || "—")}
         </div>
       </div>
-      {/* Body */}
       <div style={{ padding: "26px 32px 20px" }}>
-        {/* Section 1 */}
         <div style={{ marginBottom: 26 }}>
           {sectionHead("1", "Nội Dung Học")}
           {contentLines.length > 0 ? (
@@ -683,7 +692,6 @@ function DiaryCard(props: {
             </ul>
           ) : <p style={{ color: "#999", fontStyle: "italic" }}>(chưa nhập)</p>}
         </div>
-        {/* Section 2 */}
         <div style={{ marginBottom: 26 }}>
           {sectionHead("2", "Tình Hình Lớp")}
           {students.length > 0 ? (
@@ -711,13 +719,11 @@ function DiaryCard(props: {
             </table>
           ) : <p style={{ color: "#999", fontStyle: "italic" }}>(chưa có học viên)</p>}
         </div>
-        {/* Ảnh minh hoạ (nếu có) */}
         {imageUrl && (
           <div style={{ marginBottom: 26, textAlign: "center" }}>
             <img src={imageUrl} alt="minh hoạ" crossOrigin="anonymous" style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 10, border: `1px solid ${GOLD}` }} />
           </div>
         )}
-        {/* Section 3 */}
         <div style={{ marginBottom: 8 }}>
           {sectionHead("3", "Bài Tập Về Nhà & Dặn Dò")}
           {homeworkLines.length > 0 ? (
@@ -727,7 +733,6 @@ function DiaryCard(props: {
           ) : <p style={{ color: "#999", fontStyle: "italic" }}>(chưa nhập)</p>}
         </div>
       </div>
-      {/* Footer */}
       <div style={{ background: "#FAF6EE", borderTop: `2px solid ${GOLD}`, padding: "16px 32px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
         <div>
           <div style={{ fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800, color: BLUE }}>VESTA UNI</div>
@@ -736,6 +741,81 @@ function DiaryCard(props: {
         <div style={{ textAlign: "right", color: BLUE, lineHeight: 1.6 }}>
           <div>www.vestaedu.online · 083 877 9988</div>
           <div>60 Hoàng Quốc Việt, Hà Nội</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+// ───────── Modal chuyển HS sang lớp khác (giữ lớp hiện tại) ─────────
+function TransferClassModal({ student, currentClassId, onClose, onDone }: { student: any; currentClassId: string; onClose: () => void; onDone: () => void }) {
+  const [myClasses, setMyClasses] = useState<any[]>([]);
+  const [allClasses, setAllClasses] = useState<any[]>([]);
+  const [targetId, setTargetId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    (async () => {
+      const [mine, all] = await Promise.all([
+        api.get(`/classes/of-student/${student.id}`),
+        api.get(`/classes`),
+      ]);
+      if (mine.success) setMyClasses(mine.data || []);
+      if (all.success) setAllClasses(all.data || []);
+      setLoading(false);
+    })();
+  }, [student.id]);
+  const myIds = new Set(myClasses.map((c: any) => c.id));
+  const available = allClasses.filter((c: any) => !myIds.has(c.id));
+  async function submit() {
+    if (!targetId) return;
+    setSaving(true);
+    const res = await api.post(`/classes/${targetId}/enroll`, { studentIds: [student.id] });
+    setSaving(false);
+    if (res.success) onDone();
+    else alert(res.message || "Lỗi chuyển lớp");
+  }
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="font-display text-xl font-bold text-royal">Chuyển sang lớp khác</h3>
+            <p className="text-xs text-muted">{student.fullName} {student.studentCode ? `(${student.studentCode})` : ""}</p>
+          </div>
+          <button onClick={onClose} className="text-muted hover:text-royal"><X size={20} /></button>
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin text-gold" /></div>
+        ) : (
+          <>
+            <div className="mb-3 rounded-lg bg-cream px-3 py-2 text-xs text-muted">
+              Học viên sẽ được <b className="text-royal">thêm vào lớp mới</b> và <b className="text-royal">vẫn giữ ở lớp hiện tại</b>. Điểm danh/điểm cũ không thay đổi.
+            </div>
+            {myClasses.length > 0 && (
+              <div className="mb-3">
+                <p className="mb-1 text-xs font-bold uppercase tracking-wider text-muted">Đang thuộc lớp</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {myClasses.map((c: any) => (
+                    <span key={c.id} className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${c.id === currentClassId ? "bg-royal/10 text-royal" : "bg-gray-100 text-gray-600"}`}>
+                      {c.name}{c.course ? ` (${c.course})` : ""}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="mb-1 text-xs font-bold uppercase tracking-wider text-muted">Chọn lớp muốn chuyển sang</p>
+            <select value={targetId} onChange={(e) => setTargetId(e.target.value)} className="input-field w-full">
+              <option value="">— Chọn lớp —</option>
+              {available.map((c: any) => <option key={c.id} value={c.id}>{c.name}{c.course ? ` (${c.course})` : ""}</option>)}
+            </select>
+            {available.length === 0 && <p className="mt-2 text-xs text-amber-600">Học viên đã thuộc tất cả các lớp hiện có.</p>}
+          </>
+        )}
+        <div className="mt-5 flex justify-end gap-3">
+          <button onClick={onClose} className="btn-secondary">Huỷ</button>
+          <button onClick={submit} disabled={!targetId || saving} className="btn-primary disabled:opacity-40">
+            {saving ? "Đang chuyển..." : "Chuyển sang lớp này"}
+          </button>
         </div>
       </div>
     </div>
