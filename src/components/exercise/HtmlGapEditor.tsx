@@ -2,12 +2,13 @@
 // Editor gap giữ NGUYÊN HTML (bảng, màu, iframe) — contentEditable thuần, giống LearnClick.
 // Không dùng TipTap vì StarterKit nuốt sạch table/style/iframe.
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { importLearnClickHtml } from "@/lib/learnclickImport";
 import { api, getImageUrl } from "@/lib/api";
 export type GapType = "TEXT" | "DROPDOWN" | "DRAG";
 export interface GapDef { type: GapType; answers: string[]; options?: string[] }
 export interface GapData { content: string; gaps: Record<string, GapDef> }
+export interface HtmlGapEditorHandle { getData: () => GapData }  // trang cha gọi lúc Lưu để lấy đúng nội dung từ DOM
 interface Props {
   initial?: GapData;
   onChange?: (d: GapData) => void;
@@ -49,7 +50,7 @@ function serializeHost(host: HTMLElement): GapData {
   return { content: clone.innerHTML, gaps };
 }
 interface Editing { id: string; type: GapType; answers: string; options: string }
-export default function HtmlGapEditor({ initial, onChange }: Props) {
+const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEditor({ initial, onChange }, ref) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const imgInputRef = useRef<HTMLInputElement | null>(null);
   const savedRange = useRef<Range | null>(null);   // lưu vị trí con trỏ trước khi mở dialog ảnh
@@ -58,6 +59,14 @@ export default function HtmlGapEditor({ initial, onChange }: Props) {
   const [editing, setEditing] = useState<Editing | null>(null);
   const [count, setCount] = useState(0);
   const [uploadingImg, setUploadingImg] = useState(false);
+  // Trang cha gọi lúc Lưu — đọc nội dung THẲNG TỪ DOM (không phụ thuộc state có thể lệch sau chèn/xoá ảnh)
+  useImperativeHandle(ref, () => ({
+    getData: () => {
+      const host = hostRef.current;
+      if (!host) return { content: "", gaps: {} };
+      return serializeHost(host);
+    },
+  }), []);
   const emit = useCallback(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -119,17 +128,19 @@ export default function HtmlGapEditor({ initial, onChange }: Props) {
     host.addEventListener("keydown", onKey);
     return () => host.removeEventListener("keydown", onKey);
   }, [makeGap]);
-  // Lưu vị trí con trỏ hiện tại (trong editor) — gọi trước khi mở file dialog
+  // Lưu vị trí con trỏ hiện tại (trong editor) — gọi trước khi mở file dialog.
+  // CHỈ lưu khi con trỏ nằm THỰC SỰ bên trong host (tránh range trỏ ra ngoài làm hỏng chèn ảnh).
   function rememberCursor() {
     const host = hostRef.current;
     const sel = window.getSelection();
     if (host && sel && sel.rangeCount > 0) {
       const r = sel.getRangeAt(0);
-      if (host.contains(r.commonAncestorContainer)) savedRange.current = r.cloneRange();
-      else savedRange.current = null;
-    } else {
-      savedRange.current = null;
+      if (host.contains(r.commonAncestorContainer) && r.commonAncestorContainer !== host.parentNode) {
+        savedRange.current = r.cloneRange();
+        return;
+      }
     }
+    savedRange.current = null;
   }
   // Bấm nút "Chèn ảnh" → nhớ vị trí con trỏ rồi mở file dialog
   function pickImage() {
@@ -150,21 +161,16 @@ export default function HtmlGapEditor({ initial, onChange }: Props) {
       const res = await api.post("/posts/upload-image", fd);
       if (!res.success) { alert(res.message || "Lỗi upload ảnh"); return; }
       const url = getImageUrl(res.data.url);
-      // Tạo <img> — max-width 100% để không tràn khung, khối riêng cho dễ nhìn; cursor pointer để báo bấm được (xoá)
+      // Tạo <img> — max-width 100% để không tràn khung; cursor pointer báo bấm được (xoá)
       const img = document.createElement("img");
       img.src = url;
       img.setAttribute("style", "max-width:100%;height:auto;display:block;margin:8px auto;cursor:pointer;");
-      // Chèn vào vị trí con trỏ đã lưu; nếu không có thì thêm cuối bài
+      // Chèn vào vị trí con trỏ đã lưu NẾU nó nằm trong host; nếu không → thêm cuối bài.
       const range = savedRange.current;
-      if (range && host.contains(range.commonAncestorContainer)) {
-        range.collapse(false);
-        range.insertNode(img);
-        // đưa con trỏ ra sau ảnh
-        range.setStartAfter(img);
-        range.setEndAfter(img);
-        const sel = window.getSelection();
-        sel?.removeAllRanges();
-        sel?.addRange(range);
+      const validRange = range && host.contains(range.commonAncestorContainer) && range.commonAncestorContainer !== host.parentNode;
+      if (validRange) {
+        range!.collapse(false);
+        range!.insertNode(img);
       } else {
         host.appendChild(img);
       }
@@ -222,6 +228,7 @@ export default function HtmlGapEditor({ initial, onChange }: Props) {
     // Click vào ảnh → hỏi xoá (tránh trường hợp chèn nhầm)
     if (target.tagName === "IMG") {
       if (confirm("Xoá ảnh này khỏi bài?")) {
+        savedRange.current = null;   // range có thể trỏ quanh ảnh vừa xoá → bỏ, tránh treo
         target.remove();
         emit();
       }
@@ -376,4 +383,5 @@ export default function HtmlGapEditor({ initial, onChange }: Props) {
       )}
     </div>
   );
-}
+});
+export default HtmlGapEditor;

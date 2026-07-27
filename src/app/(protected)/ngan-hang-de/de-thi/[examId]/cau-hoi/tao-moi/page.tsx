@@ -6,7 +6,7 @@ import { ArrowLeft, Save, Plus, X, ImagePlus, Headphones } from "lucide-react";
 import Link from "next/link";
 import { api, getImageUrl } from "@/lib/api";
 import QuestionContentEditor from "@/components/exam/QuestionContentEditor";
-import HtmlGapEditor, { GapData } from "@/components/exercise/HtmlGapEditor";
+import HtmlGapEditor, { GapData, HtmlGapEditorHandle } from "@/components/exercise/HtmlGapEditor";
 import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
 export default function CreateQuestionPage() {
@@ -30,6 +30,7 @@ export default function CreateQuestionPage() {
   const [fillMode, setFillMode] = useState<"single" | "multi">("single");
   const [gapData, setGapData] = useState<GapData>({ content: "", gaps: {} });
   const mediaInputRef = useRef<HTMLInputElement>(null);
+  const gapEditorRef = useRef<HtmlGapEditorHandle>(null);
 
   function updateOption(i: number, val: string) { const o = [...options]; o[i] = val; setOptions(o); }
   function addOption() { setOptions([...options, ""]); }
@@ -62,8 +63,9 @@ export default function CreateQuestionPage() {
   function removeMedia() { setMediaUrl(""); setMediaPreview(""); setMediaType("none"); }
 
   async function handleSave() {
-    // Câu nhiều gap: nội dung lấy từ HtmlGapEditor; câu thường lấy từ QuestionContentEditor
-    const finalContent = isMultiGap ? gapData.content : content;
+    // Câu nhiều gap: đọc THẲNG từ DOM editor qua ref (state gapData có thể lệch sau chèn/xoá ảnh)
+    const liveGap = isMultiGap ? (gapEditorRef.current?.getData() ?? gapData) : gapData;
+    const finalContent = isMultiGap ? liveGap.content : content;
     if (!finalContent) { setError(isMultiGap ? "Chưa có nội dung bài (dán HTML hoặc tạo chỗ trống)" : "Vui lòng nhập nội dung câu hỏi"); return; }
 
     // Chặn sớm: thiếu đáp án thì báo rõ, đừng để backend trả lỗi chung
@@ -72,7 +74,7 @@ export default function CreateQuestionPage() {
       if (validOptions.length < 2) { setError("Cần ít nhất 2 đáp án cho câu trắc nghiệm"); return; }
       if (!String(correctAnswer ?? "").trim()) { setError("Chọn radio để đánh dấu đáp án đúng"); return; }
     } else if (isMultiGap) {
-      if (gapCount < 1) { setError("Bài chưa có chỗ trống nào — bôi đen + ⌘G hoặc dán HTML LearnClick"); return; }
+      if (Object.keys(liveGap.gaps || {}).length < 1) { setError("Bài chưa có chỗ trống nào — bôi đen + ⌘G hoặc dán HTML LearnClick"); return; }
     } else if (type !== "ESSAY") {
       if (!String(correctAnswer ?? "").trim()) { setError("Vui lòng nhập đáp án đúng"); return; }
     }
@@ -149,7 +151,7 @@ export default function CreateQuestionPage() {
         {isMultiGap ? (
           <div className="card">
             <label className="mb-2 block text-sm font-medium text-royal">Nội dung bài (chỗ trống)</label>
-            <HtmlGapEditor initial={gapData} onChange={setGapData} />
+            <HtmlGapEditor ref={gapEditorRef} initial={gapData} onChange={setGapData} />
           </div>
         ) : (
           <QuestionContentEditor value={content} onChange={setContent} />

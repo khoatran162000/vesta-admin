@@ -6,7 +6,7 @@ import { ArrowLeft, Save, Plus, X, Loader2, ImagePlus, Headphones } from "lucide
 import Link from "next/link";
 import { api, getImageUrl } from "@/lib/api";
 import QuestionContentEditor from "@/components/exam/QuestionContentEditor";
-import HtmlGapEditor, { GapData } from "@/components/exercise/HtmlGapEditor";
+import HtmlGapEditor, { GapData, HtmlGapEditorHandle } from "@/components/exercise/HtmlGapEditor";
 import { useRequireAdmin } from "@/hooks/useRequireAdmin";
 
 export default function EditQuestionPage() {
@@ -30,6 +30,7 @@ export default function EditQuestionPage() {
   const [fillMode, setFillMode] = useState<"single" | "multi">("single");
   const [gapData, setGapData] = useState<GapData>({ content: "", gaps: {} });
   const mediaInputRef = useRef<HTMLInputElement>(null);
+  const gapEditorRef = useRef<HtmlGapEditorHandle>(null);
 
   useEffect(() => {
     async function load() {
@@ -92,14 +93,16 @@ export default function EditQuestionPage() {
   function removeMedia() { setMediaUrl(""); setMediaType("none"); }
 
   async function handleSave() {
-    const finalContent = isMultiGap ? gapData.content : content;
+    // Câu nhiều gap: đọc THẲNG từ DOM editor qua ref (state có thể lệch sau chèn/xoá ảnh)
+    const liveGap = isMultiGap ? (gapEditorRef.current?.getData() ?? gapData) : gapData;
+    const finalContent = isMultiGap ? liveGap.content : content;
     if (!finalContent) { setError(isMultiGap ? "Chưa có nội dung bài (dán HTML hoặc tạo chỗ trống)" : "Vui lòng nhập nội dung câu hỏi"); return; }
     if (type === "MULTIPLE_CHOICE") {
       const validOptions = options.filter(Boolean);
       if (validOptions.length < 2) { setError("Cần ít nhất 2 đáp án cho câu trắc nghiệm"); return; }
       if (!String(correctAnswer ?? "").trim()) { setError("Chọn radio để đánh dấu đáp án đúng"); return; }
     } else if (isMultiGap) {
-      if (gapCount < 1) { setError("Bài chưa có chỗ trống nào — bôi đen + ⌘G hoặc dán HTML LearnClick"); return; }
+      if (Object.keys(liveGap.gaps || {}).length < 1) { setError("Bài chưa có chỗ trống nào — bôi đen + ⌘G hoặc dán HTML LearnClick"); return; }
     } else if (type !== "ESSAY") {
       if (!String(correctAnswer ?? "").trim()) { setError("Vui lòng nhập đáp án đúng"); return; }
     }
@@ -109,7 +112,7 @@ export default function EditQuestionPage() {
       const body: any = { type, content: finalContent, explanation, score: parseFloat(score), mediaUrl: mediaUrl || null };
       if (type === "MULTIPLE_CHOICE") { body.options = options.filter(Boolean); body.correctAnswer = correctAnswer; body.gaps = {}; }
       else if (type === "FILL_IN_BLANK") {
-        if (isMultiGap) { body.gaps = gapData.gaps; body.correctAnswer = {}; }  // đáp án trong gaps
+        if (isMultiGap) { body.gaps = liveGap.gaps; body.correctAnswer = {}; }  // đáp án trong gaps (đọc từ ref)
         else { body.correctAnswer = correctAnswer; body.gaps = {}; }            // {} → backend xoá gaps (về FILL 1 ô)
       }
       else if (type === "ESSAY") { body.correctAnswer = { type: "manual" }; body.gaps = {}; }
@@ -161,7 +164,7 @@ export default function EditQuestionPage() {
         {isMultiGap ? (
           <div className="card">
             <label className="mb-2 block text-sm font-medium text-royal">Nội dung bài (chỗ trống)</label>
-            <HtmlGapEditor initial={gapData} onChange={setGapData} />
+            <HtmlGapEditor ref={gapEditorRef} initial={gapData} onChange={setGapData} />
           </div>
         ) : (
           <QuestionContentEditor value={content} onChange={setContent} />
