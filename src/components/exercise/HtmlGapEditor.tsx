@@ -150,10 +150,10 @@ export default function HtmlGapEditor({ initial, onChange }: Props) {
       const res = await api.post("/posts/upload-image", fd);
       if (!res.success) { alert(res.message || "Lỗi upload ảnh"); return; }
       const url = getImageUrl(res.data.url);
-      // Tạo <img> — max-width 100% để không tràn khung, khối riêng cho dễ nhìn
+      // Tạo <img> — max-width 100% để không tràn khung, khối riêng cho dễ nhìn; cursor pointer để báo bấm được (xoá)
       const img = document.createElement("img");
       img.src = url;
-      img.setAttribute("style", "max-width:100%;height:auto;display:block;margin:8px auto;");
+      img.setAttribute("style", "max-width:100%;height:auto;display:block;margin:8px auto;cursor:pointer;");
       // Chèn vào vị trí con trỏ đã lưu; nếu không có thì thêm cuối bài
       const range = savedRange.current;
       if (range && host.contains(range.commonAncestorContainer)) {
@@ -216,9 +216,18 @@ export default function HtmlGapEditor({ initial, onChange }: Props) {
         : "Đã nạp HTML nhưng KHÔNG thấy thẻ <a class=\"cloze\"> nào — bài sẽ chưa có chỗ trống. Bôi đen + Cmd+G để tự tạo."
     );
   }
-  // Bấm chip → mở bảng sửa
+  // Bấm chip → mở bảng sửa; bấm ảnh → hỏi xoá
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
-    const chip = (e.target as HTMLElement).closest?.("span.vgap") as HTMLElement | null;
+    const target = e.target as HTMLElement;
+    // Click vào ảnh → hỏi xoá (tránh trường hợp chèn nhầm)
+    if (target.tagName === "IMG") {
+      if (confirm("Xoá ảnh này khỏi bài?")) {
+        target.remove();
+        emit();
+      }
+      return;
+    }
+    const chip = target.closest?.("span.vgap") as HTMLElement | null;
     if (!chip) return;
     setEditing({
       id: chip.getAttribute("data-gap-id") || "",
@@ -333,7 +342,7 @@ export default function HtmlGapEditor({ initial, onChange }: Props) {
         />
       </div>
       <p className="mt-2 text-xs text-gray-400">
-        Bấm vào chip để sửa đáp án / đổi dạng. Nhiều đáp án ngăn bằng dấu #. Đặt con trỏ vào chỗ cần rồi bấm <b>Chèn ảnh</b> để thêm hình.
+        Bấm vào chip để sửa đáp án / đổi dạng. Nhiều đáp án ngăn bằng dấu #. Đặt con trỏ vào chỗ cần rồi bấm <b>Chèn ảnh</b> để thêm hình. <b>Bấm vào ảnh</b> để xoá nếu chèn nhầm.
       </p>
       {/* Bảng sửa chip */}
       {editing && (
