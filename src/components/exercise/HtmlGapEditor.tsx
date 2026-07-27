@@ -5,6 +5,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { importLearnClickHtml } from "@/lib/learnclickImport";
 import { api, getImageUrl } from "@/lib/api";
+import { Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, AlignJustify, RemoveFormatting } from "lucide-react";
 export type GapType = "TEXT" | "DROPDOWN" | "DRAG";
 export interface GapDef { type: GapType; answers: string[]; options?: string[] }
 export interface GapData { content: string; gaps: Record<string, GapDef> }
@@ -95,6 +96,32 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     tmp.innerHTML = chipHtml(id, type, answers, options);
     return tmp.firstElementChild as HTMLElement;
   }
+  // ─── Định dạng chữ (execCommand) — áp lên phần bôi đen trong editor ───
+  function exec(command: string, value?: string) {
+    const host = hostRef.current;
+    if (!host) return;
+    host.focus();
+    try { document.execCommand(command, false, value); } catch {}
+    emit();
+  }
+  function applyFontSize(px: string) {
+    const host = hostRef.current;
+    if (!host || !px) return;
+    host.focus();
+    // execCommand fontSize dùng thang 1-7; để đặt px chính xác, bọc selection bằng span style.
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    const range = sel.getRangeAt(0);
+    if (!host.contains(range.commonAncestorContainer)) return;
+    const span = document.createElement("span");
+    span.style.fontSize = `${px}px`;
+    try {
+      span.appendChild(range.extractContents());
+      range.insertNode(span);
+      sel.removeAllRanges();
+    } catch {}
+    emit();
+  }
   // Bôi đen → tạo gap (Cmd+G / Ctrl+G hoặc bấm nút)
   const makeGap = useCallback((type: GapType) => {
     const host = hostRef.current;
@@ -129,7 +156,6 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     return () => host.removeEventListener("keydown", onKey);
   }, [makeGap]);
   // Lưu vị trí con trỏ hiện tại (trong editor) — gọi trước khi mở file dialog.
-  // CHỈ lưu khi con trỏ nằm THỰC SỰ bên trong host (tránh range trỏ ra ngoài làm hỏng chèn ảnh).
   function rememberCursor() {
     const host = hostRef.current;
     const sel = window.getSelection();
@@ -161,11 +187,9 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
       const res = await api.post("/posts/upload-image", fd);
       if (!res.success) { alert(res.message || "Lỗi upload ảnh"); return; }
       const url = getImageUrl(res.data.url);
-      // Tạo <img> — max-width 100% để không tràn khung; cursor pointer báo bấm được (xoá)
       const img = document.createElement("img");
       img.src = url;
       img.setAttribute("style", "max-width:100%;height:auto;display:block;margin:8px auto;cursor:pointer;");
-      // Chèn vào vị trí con trỏ đã lưu NẾU nó nằm trong host; nếu không → thêm cuối bài.
       const range = savedRange.current;
       const validRange = range && host.contains(range.commonAncestorContainer) && range.commonAncestorContainer !== host.parentNode;
       if (validRange) {
@@ -225,10 +249,9 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
   // Bấm chip → mở bảng sửa; bấm ảnh → hỏi xoá
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
     const target = e.target as HTMLElement;
-    // Click vào ảnh → hỏi xoá (tránh trường hợp chèn nhầm)
     if (target.tagName === "IMG") {
       if (confirm("Xoá ảnh này khỏi bài?")) {
-        savedRange.current = null;   // range có thể trỏ quanh ảnh vừa xoá → bỏ, tránh treo
+        savedRange.current = null;
         target.remove();
         emit();
       }
@@ -279,6 +302,8 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     });
     emit();
   }
+  // Nút định dạng nhỏ gọn
+  const fmtBtn = "flex items-center justify-center rounded p-1.5 text-gray-600 hover:bg-gray-200";
   return (
     <div>
       {/* Ô dán HTML từ LearnClick */}
@@ -312,7 +337,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
           </>
         )}
       </div>
-      {/* Thanh công cụ */}
+      {/* Thanh công cụ tạo gap + chèn ảnh */}
       <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2">
         <span className="text-xs font-medium text-gray-500">Bôi đen rồi bấm (hoặc <b>⌘G / Ctrl+G</b>):</span>
         <button type="button" onClick={() => makeGap("TEXT")} className="rounded bg-blue-600 px-3 py-1 text-xs font-bold text-white hover:bg-blue-700">+ Ô điền</button>
@@ -326,6 +351,41 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
         <span className="mx-1 h-4 w-px bg-gray-300" />
         <button type="button" onClick={renumber} className="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100">Đánh lại số</button>
         <span className="ml-auto text-xs text-gray-500">Đang có <b>{count}</b> chỗ trống</span>
+      </div>
+      {/* Thanh ĐỊNH DẠNG CHỮ — bôi đen chữ rồi bấm */}
+      <div className="mb-2 flex flex-wrap items-center gap-1 rounded-lg border border-gray-200 bg-white p-1.5">
+        <button type="button" title="Đậm" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("bold")} className={`${fmtBtn} font-bold`}><Bold size={15} /></button>
+        <button type="button" title="Nghiêng" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("italic")} className={fmtBtn}><Italic size={15} /></button>
+        <button type="button" title="Gạch chân" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("underline")} className={fmtBtn}><Underline size={15} /></button>
+        <span className="mx-0.5 h-5 w-px bg-gray-300" />
+        {/* Cỡ chữ */}
+        <select title="Cỡ chữ" defaultValue="" onMouseDown={(e) => e.stopPropagation()} onChange={(e) => { applyFontSize(e.target.value); e.currentTarget.value = ""; }}
+          className="rounded border border-gray-300 px-1.5 py-1 text-xs text-gray-600">
+          <option value="">Cỡ chữ</option>
+          <option value="12">12</option>
+          <option value="14">14</option>
+          <option value="16">16</option>
+          <option value="18">18</option>
+          <option value="20">20</option>
+          <option value="24">24</option>
+          <option value="28">28</option>
+          <option value="32">32</option>
+        </select>
+        {/* Màu chữ */}
+        <label title="Màu chữ" className={`${fmtBtn} relative cursor-pointer`}>
+          <span className="text-xs font-bold" style={{ borderBottom: "3px solid #dc2626" }}>A</span>
+          <input type="color" onChange={(e) => exec("foreColor", e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+        </label>
+        <span className="mx-0.5 h-5 w-px bg-gray-300" />
+        <button type="button" title="Canh trái" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyLeft")} className={fmtBtn}><AlignLeft size={15} /></button>
+        <button type="button" title="Canh giữa" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyCenter")} className={fmtBtn}><AlignCenter size={15} /></button>
+        <button type="button" title="Canh phải" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyRight")} className={fmtBtn}><AlignRight size={15} /></button>
+        <button type="button" title="Canh đều" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyFull")} className={fmtBtn}><AlignJustify size={15} /></button>
+        <span className="mx-0.5 h-5 w-px bg-gray-300" />
+        <button type="button" title="Danh sách chấm" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("insertUnorderedList")} className={fmtBtn}><List size={15} /></button>
+        <button type="button" title="Danh sách số" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("insertOrderedList")} className={fmtBtn}><ListOrdered size={15} /></button>
+        <span className="mx-0.5 h-5 w-px bg-gray-300" />
+        <button type="button" title="Xoá định dạng" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("removeFormat")} className={fmtBtn}><RemoveFormatting size={15} /></button>
       </div>
       {/* Vùng soạn — giữ nguyên HTML */}
       <style>{`
@@ -349,7 +409,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
         />
       </div>
       <p className="mt-2 text-xs text-gray-400">
-        Bấm vào chip để sửa đáp án / đổi dạng. Nhiều đáp án ngăn bằng dấu #. Đặt con trỏ vào chỗ cần rồi bấm <b>Chèn ảnh</b> để thêm hình. <b>Bấm vào ảnh</b> để xoá nếu chèn nhầm.
+        Bôi đen chữ rồi bấm nút trên thanh để định dạng. Bấm vào chip để sửa đáp án / đổi dạng (nhiều đáp án ngăn bằng #). Đặt con trỏ vào chỗ cần rồi bấm <b>Chèn ảnh</b>. <b>Bấm vào ảnh</b> để xoá nếu chèn nhầm.
       </p>
       {/* Bảng sửa chip */}
       {editing && (
