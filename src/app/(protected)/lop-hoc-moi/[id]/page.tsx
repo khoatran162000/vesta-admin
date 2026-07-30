@@ -1,10 +1,11 @@
-// FILE: src/app/(protected)/lop-hoc-moi/[id]/page.tsx — Chi tiết lớp + ghi danh (tìm server-side) + điểm danh + nhật ký buổi (xuất PNG) + chuyển lớp
+// FILE: src/app/(protected)/lop-hoc-moi/[id]/page.tsx — Chi tiết lớp + ghi danh (tìm server-side) + điểm danh + nhật ký buổi (xuất PNG) + lộ trình lớp + chuyển lớp
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, UserPlus, Trash2, X, Search, ClipboardCheck, Users, Check, Clock, XCircle, BookText, Plus, Save, Download, ImagePlus, Eye, Repeat } from "lucide-react";
+import { ArrowLeft, Loader2, UserPlus, Trash2, X, Search, ClipboardCheck, Users, Check, Clock, XCircle, BookText, Plus, Save, Download, ImagePlus, Eye, Repeat, Route } from "lucide-react";
 import { api, getImageUrl } from "@/lib/api";
+import ClassRoadmapPanel from "@/components/diary/ClassRoadmapPanel";
 const ENROLL_STATUS: Record<string, { label: string; cls: string }> = {
   STUDYING: { label: "Đang học", cls: "bg-green-50 text-green-700" },
   COMPLETED: { label: "Hoàn thành", cls: "bg-blue-50 text-blue-700" },
@@ -32,7 +33,7 @@ export default function ClassDetailPage() {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
   const [searching, setSearching] = useState(false);
-  const [tab, setTab] = useState<"students" | "attendance" | "diary">("students");
+  const [tab, setTab] = useState<"students" | "attendance" | "diary" | "roadmap">("students");
   const [transferStudent, setTransferStudent] = useState<any>(null); // HS đang chuyển lớp
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,11 +121,17 @@ export default function ClassDetailPage() {
           className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${tab === "diary" ? "bg-royal text-white" : "text-muted hover:bg-cream-dark"}`}>
           <BookText size={16} />Nhật ký buổi
         </button>
+        <button onClick={() => setTab("roadmap")}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${tab === "roadmap" ? "bg-royal text-white" : "text-muted hover:bg-cream-dark"}`}>
+          <Route size={16} />Lộ trình lớp
+        </button>
       </div>
       {tab === "attendance" ? (
         <AttendancePanel classId={classId} />
       ) : tab === "diary" ? (
         <SessionDiaryPanel classId={classId} cls={cls} />
+      ) : tab === "roadmap" ? (
+        <ClassRoadmapPanel classId={classId} cls={cls} />
       ) : (
         <>
           <div className="mb-4 flex items-center justify-between">
@@ -430,7 +437,6 @@ function SessionDiaryPanel({ classId, cls }: { classId: string; cls: any }) {
   const [imageUrl, setImageUrl] = useState<string>("");
   const cardRef = useRef<HTMLDivElement | null>(null);
   const imgInputRef = useRef<HTMLInputElement | null>(null);
-
   const load = useCallback(async () => {
     setLoading(true);
     const res = await api.get(`/session-diary?classId=${classId}&date=${date}`);
@@ -453,14 +459,12 @@ function SessionDiaryPanel({ classId, cls }: { classId: string; cls: any }) {
   }, [classId]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { loadDiaries(); }, [loadDiaries]);
-
   function flash(msg: string) { setSavedMsg(msg); setTimeout(() => setSavedMsg(""), 2500); }
   function setStu(i: number, field: keyof DiaryStudent, value: string) {
     setStudents((prev) => prev.map((s, idx) => idx === i ? { ...s, [field]: value } : s));
   }
   function addStu() { setStudents((prev) => [...prev, { name: "", score: "", comment: "" }]); }
   function removeStu(i: number) { setStudents((prev) => prev.filter((_, idx) => idx !== i)); }
-
   async function uploadImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -475,7 +479,6 @@ function SessionDiaryPanel({ classId, cls }: { classId: string; cls: any }) {
     setUploadingImg(false);
     e.target.value = "";
   }
-
   async function save() {
     setSaving(true);
     const res = await api.post(`/session-diary`, {
@@ -490,7 +493,6 @@ function SessionDiaryPanel({ classId, cls }: { classId: string; cls: any }) {
     flash("Đã lưu nhật ký buổi học");
     loadDiaries();
   }
-
   async function exportPNG() {
     if (!cardRef.current) return;
     setExporting(true);
@@ -507,11 +509,9 @@ function SessionDiaryPanel({ classId, cls }: { classId: string; cls: any }) {
     }
     setExporting(false);
   }
-
   const contentLines = toLines(content);
   const homeworkLines = toLines(homework);
   const filledStudents = students.filter((s) => s.name.trim() !== "");
-
   return (
     <div>
       <div className="card mb-4 flex flex-wrap items-end justify-between gap-4">
@@ -533,7 +533,6 @@ function SessionDiaryPanel({ classId, cls }: { classId: string; cls: any }) {
           <button onClick={save} disabled={saving} className="btn-primary"><Save size={15} />{saving ? "Đang lưu..." : "Lưu nhật ký"}</button>
         </div>
       </div>
-
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-gold" /></div>
       ) : (
@@ -548,14 +547,12 @@ function SessionDiaryPanel({ classId, cls }: { classId: string; cls: any }) {
               <input value={assistantName} onChange={(e) => setAssistantName(e.target.value)} placeholder="Tên trợ giảng" className="input-field" />
             </div>
           </div>
-
           <div className="card mb-4">
             <label className="mb-1.5 block text-xs font-bold text-muted">① Nội dung học</label>
             <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={3}
               placeholder="Mỗi dòng = 1 gạch đầu dòng&#10;VD:&#10;Từ vựng chủ đề Cities & Transportation&#10;Kỹ năng nghe: Map labelling" className="input-field" />
             <p className="mt-1 text-[0.7rem] text-muted">Mỗi dòng = 1 gạch đầu dòng.</p>
           </div>
-
           <div className="card mb-4">
             <div className="mb-2 flex items-center justify-between">
               <label className="text-xs font-bold text-muted">② Tình hình lớp — Học viên · Điểm · Nhận xét</label>
@@ -578,14 +575,12 @@ function SessionDiaryPanel({ classId, cls }: { classId: string; cls: any }) {
             </div>
             <button onClick={addStu} className="mt-3 flex items-center gap-1 text-xs font-medium text-gold hover:text-gold-light"><Plus size={13} />Thêm học viên</button>
           </div>
-
           <div className="card mb-4">
             <label className="mb-1.5 block text-xs font-bold text-muted">③ Bài tập về nhà & dặn dò</label>
             <textarea value={homework} onChange={(e) => setHomework(e.target.value)} rows={3}
               placeholder="Mỗi dòng = 1 gạch đầu dòng&#10;VD:&#10;Hoàn thành Unit 2 - phần Reading (trang 24-25)&#10;Học thuộc 20 từ vựng chủ đề Transportation" className="input-field" />
             <p className="mt-1 text-[0.7rem] text-muted">Mỗi dòng = 1 gạch đầu dòng.</p>
           </div>
-
           <div className="card mb-4">
             <label className="mb-2 block text-xs font-bold text-muted">Ảnh minh hoạ (tuỳ chọn) & Xuất ảnh</label>
             <div className="flex flex-wrap items-center gap-3">
@@ -610,7 +605,6 @@ function SessionDiaryPanel({ classId, cls }: { classId: string; cls: any }) {
             </div>
             <p className="mt-2 text-[0.7rem] text-muted">Bấm &quot;Xuất ảnh PNG&quot; để tải thẻ nhật ký đẹp gửi phụ huynh. Nên bấm &quot;Lưu nhật ký&quot; trước để không mất dữ liệu.</p>
           </div>
-
           {showPreview && (
             <div className="mb-4 overflow-x-auto">
               <DiaryCard
@@ -630,7 +624,6 @@ function SessionDiaryPanel({ classId, cls }: { classId: string; cls: any }) {
           )}
         </>
       )}
-
       {diaries.length > 0 && (
         <div className="mt-6">
           <h4 className="mb-2 text-sm font-bold text-royal">Các buổi đã ghi nhật ký ({diaries.length})</h4>
