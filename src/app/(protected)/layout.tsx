@@ -42,6 +42,7 @@ const NAV: NavItem[] = [
     { href: "/khoa-hoc", label: "Khoá học", roles: ADMIN },
     { href: "/sach", label: "Sách & Giáo trình", roles: ADMIN },
     { href: "/noi-dung-trang-chu", label: "Nội dung trang chủ", roles: CMS },
+    { href: "/huong-dan-nhap-hoc", label: "Hướng dẫn nhập học", roles: CMS },
   ]},
   { href: "/theo-doi", label: "Theo dõi học viên", icon: GraduationCap, roles: STAFF },
   { href: "/theo-doi/ky-luat", label: "Kỷ luật học tập", icon: ShieldAlert, roles: STAFF },
