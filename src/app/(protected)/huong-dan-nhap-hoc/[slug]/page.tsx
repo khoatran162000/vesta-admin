@@ -5,14 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Loader2, Eye, Code } from "lucide-react";
 import { api } from "@/lib/api";
-const LABELS: Record<string, string> = {
-  ielts4plus: "IELTS 4+", ielts5plus: "IELTS 5+", ielts6plus: "IELTS 6+", ielts7plus: "IELTS 7+", intensive: "789 Intensive",
-};
 export default function EditEnrollGuidePage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
   const key = `enroll_${slug}`;
   const [html, setHtml] = useState("");
+  const [label, setLabel] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
@@ -22,7 +20,10 @@ export default function EditEnrollGuidePage() {
     (async () => {
       setLoading(true);
       const res = await api.get(`/site-content/${key}`);
-      if (res.success && res.data?.data?.html) setHtml(res.data.data.html);
+      if (res.success) {
+        if (res.data?.data?.html) setHtml(res.data.data.html);
+        if (res.data?.label) setLabel(String(res.data.label).replace(/^Hướng dẫn nhập học\s*/i, ""));
+      }
       setLoading(false);
     })();
   }, [key]);
@@ -35,7 +36,7 @@ export default function EditEnrollGuidePage() {
   async function save() {
     setSaving(true); setMsg("");
     const res = await api.put(`/site-content/${key}`, {
-      label: `Hướng dẫn nhập học ${LABELS[slug] || slug}`,
+      label: `Hướng dẫn nhập học ${label || slug}`,
       data: JSON.stringify({ html, slug }),
     });
     setSaving(false);
@@ -48,11 +49,10 @@ export default function EditEnrollGuidePage() {
       <div className="mb-4 flex items-center gap-3">
         <Link href="/huong-dan-nhap-hoc" className="rounded-lg p-2 text-muted hover:bg-cream-dark hover:text-royal"><ArrowLeft size={20} /></Link>
         <div>
-          <h2 className="font-display text-2xl font-bold text-royal">Sửa hướng dẫn nhập học — {LABELS[slug] || slug}</h2>
+          <h2 className="font-display text-2xl font-bold text-royal">Sửa hướng dẫn nhập học — {label || slug}</h2>
           <p className="text-xs text-muted">Sửa HTML trực tiếp hoặc dán bản mới. Bấm &quot;Xem trước&quot; để kiểm tra rồi Lưu.</p>
         </div>
       </div>
-
       <div className="mb-3 flex items-center justify-between">
         <div className="flex gap-1 rounded-lg border border-silver/30 bg-white p-1">
           <button onClick={() => setTab("code")}
@@ -71,7 +71,6 @@ export default function EditEnrollGuidePage() {
           <button onClick={save} disabled={saving} className="btn-primary"><Save size={15} />{saving ? "Đang lưu..." : "Lưu"}</button>
         </div>
       </div>
-
       {tab === "code" ? (
         <>
           <textarea
