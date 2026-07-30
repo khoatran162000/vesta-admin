@@ -1,39 +1,39 @@
 // FILE: src/components/diary/ClassRoadmapPanel.tsx
 // Tab "Lộ trình lớp": lộ trình bên trái (tick bài hiện tại) + bảng điểm danh 5 cột bên phải.
-// Lưu DB qua /session-diary (dùng chung API với nhật ký cũ). Xuất PNG.
+// Lưu DB qua /session-diary (dùng chung API với nhật ký cũ). Xuất PNG thẻ đẹp gửi phụ huynh.
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Save, Loader2, Plus, Trash2, Download, Eye } from "lucide-react";
 import { api } from "@/lib/api";
 import ClassRoadmap from "./ClassRoadmap";
-import { PROGRAM_LIST, PROGRAMS, flatten } from "@/lib/classCurriculum";
+import { PROGRAM_LIST, PROGRAMS, flatten, type Program } from "@/lib/classCurriculum";
 
 function todayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 function fmtDateVN(ymd: string) { const [y,m,d] = ymd.split("-"); return `${d}/${m}/${y}`; }
 
-// 1 dòng học sinh — 5 cột
 interface Row {
   name: string;
   attend: "present" | "late" | "absent" | "";
-  warmup: string;   // Từ đầu giờ
-  classScore: string; // Điểm trên lớp
-  homework: string; // Bài về nhà
-  comment: string;  // Nhận xét
+  warmup: string;
+  classScore: string;
+  homework: string;
+  comment: string;
 }
-const ATTEND_OPTS: { v: Row["attend"]; label: string; color: string }[] = [
-  { v: "present", label: "Đúng giờ", color: "text-green-700 bg-green-50" },
-  { v: "late", label: "Muộn", color: "text-amber-700 bg-amber-50" },
-  { v: "absent", label: "Vắng", color: "text-red-700 bg-red-50" },
+const ATTEND_OPTS: { v: Row["attend"]; label: string }[] = [
+  { v: "present", label: "Đúng giờ" },
+  { v: "late", label: "Muộn" },
+  { v: "absent", label: "Vắng" },
 ];
+const ATTEND_LABEL: Record<string, string> = { present: "Đúng giờ", late: "Muộn", absent: "Vắng", "": "—" };
 
-const GOLD = "#C9A84C";
-const NAVY = "#1B2A5B";
+const GOLD = "#C9A84C", GOLD_DARK = "#A6882E", CRIMSON = "#B22234", BLUE = "#1B2A5B", INK = "#1A1A2E";
 
 export default function ClassRoadmapPanel({ classId, cls }: { classId: string; cls: any }) {
   const [date, setDate] = useState(todayStr());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [msg, setMsg] = useState("");
   const [programKey, setProgramKey] = useState("p4");
   const [currentLesson, setCurrentLesson] = useState(0);
@@ -44,7 +44,6 @@ export default function ClassRoadmapPanel({ classId, cls }: { classId: string; c
 
   function flash(m: string) { setMsg(m); setTimeout(() => setMsg(""), 2500); }
 
-  // Đoán chương trình mặc định từ course của lớp (4+/5+/6+/7+/789)
   function guessProgram(course?: string): string {
     const c = String(course || "").toLowerCase();
     if (c.includes("789") || c.includes("intensive") || c.includes("đề")) return "p789";
@@ -63,7 +62,6 @@ export default function ClassRoadmapPanel({ classId, cls }: { classId: string; c
       setAssistantName(d.assistantName || "");
       setProgramKey(d.programKey || guessProgram(d.course || cls?.course));
       setCurrentLesson(d.currentLesson || 0);
-      // students Json: dùng lại name; map các cột mới (nếu bản ghi cũ thiếu thì để rỗng)
       const list = Array.isArray(d.students) ? d.students : [];
       setRows(list.map((s: any) => ({
         name: s.name || "",
@@ -114,6 +112,7 @@ export default function ClassRoadmapPanel({ classId, cls }: { classId: string; c
   const prog = PROGRAMS[programKey];
   const flat = prog ? flatten(prog) : [];
   const curLabel = currentLesson > 0 ? (flat.find((f) => f.n === currentLesson)?.label || "") : "";
+  const filledRows = rows.filter((r) => r.name.trim() !== "");
 
   return (
     <div>
@@ -133,6 +132,7 @@ export default function ClassRoadmapPanel({ classId, cls }: { classId: string; c
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {msg && <span className="text-xs font-semibold text-green-600">{msg}</span>}
+          <button onClick={() => setShowPreview((v) => !v)} className="btn-secondary"><Eye size={15} />{showPreview ? "Ẩn xem trước" : "Xem trước thẻ"}</button>
           <button onClick={exportPNG} disabled={exporting} className="btn-secondary"><Download size={15} />{exporting ? "Đang xuất..." : "Xuất ảnh"}</button>
           <button onClick={save} disabled={saving} className="btn-primary"><Save size={15} />{saving ? "Đang lưu..." : "Lưu"}</button>
         </div>
@@ -153,16 +153,14 @@ export default function ClassRoadmapPanel({ classId, cls }: { classId: string; c
         </div>
       )}
 
-      {/* Bố cục: lộ trình trái + điểm danh phải */}
-      <div ref={cardRef} className="grid grid-cols-1 gap-4 lg:grid-cols-[300px_1fr]">
-        {/* LỘ TRÌNH — cột trái */}
+      {/* Bố cục nhập liệu: lộ trình trái + điểm danh phải */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[300px_1fr]">
         <div className="card !p-3">
           <div className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">Lộ trình — click bài đang học</div>
           <ClassRoadmap programKey={programKey} currentN={currentLesson}
             onPick={(n) => setCurrentLesson(n === currentLesson ? 0 : n)} />
         </div>
 
-        {/* ĐIỂM DANH — cột phải, 5 cột */}
         <div className="card !p-3">
           <div className="mb-2 flex items-center justify-between">
             <div className="text-xs font-bold uppercase tracking-wide text-muted">Điểm danh & Nhận xét</div>
@@ -206,6 +204,160 @@ export default function ClassRoadmapPanel({ classId, cls }: { classId: string; c
             </table>
           </div>
           <button onClick={addRow} className="mt-2 flex items-center gap-1 text-xs font-medium text-gold hover:text-gold-light"><Plus size={13} />Thêm học viên</button>
+        </div>
+      </div>
+
+      {/* Thẻ xuất PNG — hiện khi Xem trước; luôn render off-screen để Xuất ảnh chụp được */}
+      <div className={showPreview ? "mt-5 overflow-x-auto" : "pointer-events-none fixed -left-[9999px] top-0"}>
+        <RoadmapCard
+          cardRef={cardRef}
+          className={cls?.name || ""}
+          dateVN={fmtDateVN(date)}
+          teacherName={teacherName}
+          assistantName={assistantName}
+          prog={prog}
+          currentLesson={currentLesson}
+          currentLabel={curLabel}
+          rows={filledRows}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ───────── Thẻ xuất PNG: header VESTA + lộ trình trái + bảng điểm danh phải ─────────
+function RoadmapCard({ cardRef, className, dateVN, teacherName, assistantName, prog, currentLesson, currentLabel, rows }: {
+  cardRef: React.RefObject<HTMLDivElement | null>;
+  className: string; dateVN: string; teacherName: string; assistantName: string;
+  prog?: Program; currentLesson: number; currentLabel: string; rows: Row[];
+}) {
+  const flat = prog ? flatten(prog) : [];
+
+  // Dựng lộ trình dạng nhóm cho thẻ (unit / section / buổi)
+  function renderRail() {
+    if (!prog) return null;
+    const line = (n: number, text: string, indent = false) => {
+      const now = n === currentLesson;
+      const past = n < currentLesson;
+      return (
+        <div key={n} style={{
+          padding: "3px 8px", marginBottom: 2, borderRadius: 5, fontSize: 11,
+          paddingLeft: indent ? 16 : 8,
+          background: now ? BLUE : "transparent",
+          color: now ? "#fff" : past ? "#B8B8B8" : "#555",
+          fontWeight: now ? 700 : 400,
+          textDecoration: past ? "line-through" : "none",
+        }}>
+          <span style={{ opacity: 0.5, marginRight: 5 }}>{n}.</span>{text}
+        </div>
+      );
+    };
+    let running = 0;
+    if (prog.flatItems) {
+      return <div>{flat.map((l) => line(l.n, l.label))}</div>;
+    }
+    if (prog.sections) {
+      return (
+        <div>
+          {prog.sections.map((sec, si) => (
+            <div key={si} style={{ marginBottom: 8 }}>
+              <div style={{ fontWeight: 700, color: BLUE, fontSize: 11.5, borderLeft: `3px solid ${GOLD}`, paddingLeft: 6, marginBottom: 3 }}>{sec.title}</div>
+              {sec.items.map((lb) => { running++; return line(running, lb, true); })}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return (
+      <div>
+        {prog.units!.map((u, ui) => (
+          <div key={ui} style={{ marginBottom: 7 }}>
+            <div style={{ fontWeight: 700, color: BLUE, fontSize: 11.5, marginBottom: 3, display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: GOLD, display: "inline-block" }} />{u.title}
+            </div>
+            {u.lessons.map((l) => { running++; return line(running, l.label, true); })}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={cardRef} style={{ width: 960, background: "#fff", fontFamily: "'Be Vietnam Pro', Arial, sans-serif", color: INK }}>
+      {/* Header */}
+      <div style={{ background: "linear-gradient(135deg,#FAF6EE 0%,#F4ECDA 50%,#ECE0C4 100%)", padding: "22px 30px 18px", display: "flex", alignItems: "center", gap: 20, borderBottom: `2px solid ${GOLD}` }}>
+        <img src="/logo-vesta-01.jpg" alt="VESTA" crossOrigin="anonymous" style={{ width: 84, height: 84, flex: "none", objectFit: "contain" }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 3, color: GOLD_DARK }}>VESTA UNI · SINCE 2012</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#111122", letterSpacing: 1, margin: "3px 0 4px", fontFamily: "Georgia, serif" }}>LỘ TRÌNH HỌC TẬP</div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2.4, textTransform: "uppercase", color: GOLD_DARK }}>{prog?.name || ""}{prog?.meta ? ` · ${prog.meta}` : ""}</div>
+        </div>
+        <div style={{ flex: "none", minWidth: 180, background: "rgba(255,255,255,.9)", border: `1px solid ${GOLD}`, borderRadius: 12, padding: "9px 13px", fontSize: 12 }}>
+          {[["Lớp", className], ["Ngày", dateVN], ["GV", teacherName], ["TG", assistantName]].map(([k, v]) => (
+            <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "3px 0", borderBottom: "1px dashed rgba(166,136,46,.3)" }}>
+              <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: .6, textTransform: "uppercase", color: BLUE }}>{k}</span>
+              <span style={{ fontWeight: 600, color: CRIMSON, textAlign: "right" }}>{v || "—"}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Thân: lộ trình trái + bảng phải */}
+      <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
+        {/* Lộ trình trái */}
+        <div style={{ width: 280, flex: "none", background: "#FAFAF7", borderRight: `1px solid ${GOLD}`, padding: "16px 14px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: GOLD_DARK, marginBottom: 10 }}>Lộ trình khoá học</div>
+          {renderRail()}
+        </div>
+
+        {/* Bảng điểm danh phải */}
+        <div style={{ flex: 1, padding: "16px 22px" }}>
+          {currentLabel && (
+            <div style={{ marginBottom: 12, padding: "8px 12px", background: "rgba(27,42,91,.06)", borderLeft: `3px solid ${BLUE}`, borderRadius: "0 6px 6px 0" }}>
+              <span style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: .8, color: GOLD_DARK }}>Buổi hôm nay · </span>
+              <span style={{ fontWeight: 700, color: BLUE, fontSize: 13 }}>{currentLabel}</span>
+            </div>
+          )}
+          {rows.length > 0 ? (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11.5 }}>
+              <thead>
+                <tr style={{ background: BLUE, color: "#fff" }}>
+                  <th style={{ padding: "7px 8px", textAlign: "left" }}>Học viên</th>
+                  <th style={{ padding: "7px 6px", textAlign: "center" }}>Điểm danh</th>
+                  <th style={{ padding: "7px 6px", textAlign: "center" }}>Từ đầu giờ</th>
+                  <th style={{ padding: "7px 6px", textAlign: "center" }}>Điểm lớp</th>
+                  <th style={{ padding: "7px 6px", textAlign: "left" }}>Bài về nhà</th>
+                  <th style={{ padding: "7px 6px", textAlign: "left" }}>Nhận xét</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid #EEE" }}>
+                    <td style={{ padding: "6px 8px", fontWeight: 600 }}>{r.name}</td>
+                    <td style={{ padding: "6px 6px", textAlign: "center" }}>{ATTEND_LABEL[r.attend] || "—"}</td>
+                    <td style={{ padding: "6px 6px", textAlign: "center" }}>{r.warmup || "—"}</td>
+                    <td style={{ padding: "6px 6px", textAlign: "center" }}>
+                      {r.classScore ? <span style={{ display: "inline-block", background: "rgba(201,168,76,.18)", color: GOLD_DARK, fontWeight: 700, borderRadius: 5, padding: "1px 7px" }}>{r.classScore}</span> : "—"}
+                    </td>
+                    <td style={{ padding: "6px 6px", lineHeight: 1.4 }}>{r.homework || "—"}</td>
+                    <td style={{ padding: "6px 6px", lineHeight: 1.4 }}>{r.comment || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : <p style={{ color: "#999", fontStyle: "italic", fontSize: 12 }}>(chưa có học viên)</p>}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{ background: "#FAF6EE", borderTop: `2px solid ${GOLD}`, padding: "14px 30px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11.5 }}>
+        <div>
+          <div style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800, color: BLUE }}>VESTA UNI</div>
+          <div style={{ fontStyle: "italic", color: GOLD_DARK, fontSize: 10.5 }}>Học Nhanh Thi Chắc · Phá Tắc Band</div>
+        </div>
+        <div style={{ textAlign: "right", color: BLUE, lineHeight: 1.6 }}>
+          <div>www.vestaedu.online · 083 877 9988</div>
+          <div>60 Hoàng Quốc Việt, Hà Nội</div>
         </div>
       </div>
     </div>
