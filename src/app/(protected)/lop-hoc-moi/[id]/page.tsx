@@ -95,7 +95,7 @@ export default function ClassDetailPage() {
   if (!cls) return null;
   const enrollments = cls.enrollments || [];
   return (
-    <div className="mx-auto max-w-[1000px]">
+    <div className="mx-auto max-w-[1400px]">
       <Link href="/lop-hoc-moi" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-royal">
         <ArrowLeft size={15} />Quay lại danh sách lớp
       </Link>
