@@ -1,4 +1,5 @@
-// FILE: src/app/(protected)/lop-hoc-moi/[id]/page.tsx — Chi tiết lớp + ghi danh (tìm server-side) + điểm danh + nhật ký buổi (xuất PNG) + lộ trình lớp + chuyển lớp
+// FILE: src/app/(protected)/lop-hoc-moi/[id]/page.tsx — Chi tiết lớp + ghi danh (tìm server-side) + lộ trình lớp + chuyển lớp
+// (Tab Điểm danh + Nhật ký buổi ĐÃ ẨN theo yêu cầu — code panel giữ lại phòng dùng lại)
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
@@ -113,24 +114,12 @@ export default function ClassDetailPage() {
           className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${tab === "students" ? "bg-royal text-white" : "text-muted hover:bg-cream-dark"}`}>
           <Users size={16} />Danh sách học viên
         </button>
-        <button onClick={() => setTab("attendance")}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${tab === "attendance" ? "bg-royal text-white" : "text-muted hover:bg-cream-dark"}`}>
-          <ClipboardCheck size={16} />Điểm danh buổi học
-        </button>
-        <button onClick={() => setTab("diary")}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${tab === "diary" ? "bg-royal text-white" : "text-muted hover:bg-cream-dark"}`}>
-          <BookText size={16} />Nhật ký buổi
-        </button>
         <button onClick={() => setTab("roadmap")}
           className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${tab === "roadmap" ? "bg-royal text-white" : "text-muted hover:bg-cream-dark"}`}>
           <Route size={16} />Lộ trình lớp
         </button>
       </div>
-      {tab === "attendance" ? (
-        <AttendancePanel classId={classId} />
-      ) : tab === "diary" ? (
-        <SessionDiaryPanel classId={classId} cls={cls} />
-      ) : tab === "roadmap" ? (
+      {tab === "roadmap" ? (
         <ClassRoadmapPanel classId={classId} cls={cls} />
       ) : (
         <>
@@ -242,7 +231,7 @@ export default function ClassDetailPage() {
     </div>
   );
 }
-// ═══════════════ ĐIỂM DANH BUỔI HỌC ═══════════════
+// ═══════════════ ĐIỂM DANH BUỔI HỌC (ẨN — giữ lại phòng dùng lại) ═══════════════
 interface AttRow {
   studentId: string; fullName: string; studentCode: string | null;
   enrollStatus: string;
@@ -409,7 +398,7 @@ function AttendancePanel({ classId }: { classId: string }) {
     </div>
   );
 }
-// ═══════════════ NHẬT KÝ BUỔI HỌC ═══════════════
+// ═══════════════ NHẬT KÝ BUỔI HỌC (ẨN — giữ lại phòng dùng lại) ═══════════════
 interface DiaryStudent { name: string; score: string; comment: string }
 function fmtDateVN(ymd: string): string {
   const p = ymd.split("-");
