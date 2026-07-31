@@ -1,6 +1,6 @@
 // FILE: src/components/diary/ClassRoadmapPanel.tsx
-// Tab "Lộ trình lớp": lộ trình bên trái (tick bài hiện tại) + bảng điểm danh 5 cột bên phải.
-// Lưu DB qua /session-diary (dùng chung API với nhật ký cũ). Xuất PNG thẻ đẹp gửi phụ huynh.
+// Tab "Lộ trình lớp": Nội dung học (đầu) + lộ trình trái + bảng điểm danh 5 cột phải + BTVN (cuối).
+// HS sort theo TÊN (chữ cuối), hiển thị viết tắt. Header bảng sticky. Lưu DB /session-diary. Xuất PNG.
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Save, Loader2, Plus, Trash2, Download, Eye } from "lucide-react";
@@ -10,9 +10,24 @@ import { PROGRAM_LIST, PROGRAMS, flatten, type Program } from "@/lib/classCurric
 
 function todayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 function fmtDateVN(ymd: string) { const [y,m,d] = ymd.split("-"); return `${d}/${m}/${y}`; }
+function toLines(txt: string): string[] { return (txt || "").split("\n").map((l) => l.trim()).filter(Boolean); }
+
+// Viết tắt tên: "Phạm Khánh Huyền" → "P.K. Huyền" (viết tắt mọi từ trừ từ cuối)
+function abbrevName(full: string): string {
+  const parts = (full || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return full || "";
+  const last = parts[parts.length - 1];
+  const initials = parts.slice(0, -1).map((w) => w.charAt(0).toUpperCase() + ".").join("");
+  return `${initials} ${last}`;
+}
+// Chữ cuối (tên gọi) để sort kiểu Việt Nam
+function lastWord(full: string): string {
+  const parts = (full || "").trim().split(/\s+/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : "";
+}
 
 interface Row {
-  name: string;
+  name: string;               // tên đầy đủ (lưu DB)
   attend: "present" | "late" | "absent" | "";
   warmup: string;
   classScore: string;
@@ -28,6 +43,11 @@ const ATTEND_LABEL: Record<string, string> = { present: "Đúng giờ", late: "M
 
 const GOLD = "#C9A84C", GOLD_DARK = "#A6882E", CRIMSON = "#B22234", BLUE = "#1B2A5B", INK = "#1A1A2E";
 
+// Sort rows theo TÊN (chữ cuối), tiếng Việt
+function sortByName(rows: Row[]): Row[] {
+  return [...rows].sort((a, b) => lastWord(a.name).localeCompare(lastWord(b.name), "vi", { sensitivity: "base" }));
+}
+
 export default function ClassRoadmapPanel({ classId, cls }: { classId: string; cls: any }) {
   const [date, setDate] = useState(todayStr());
   const [loading, setLoading] = useState(true);
@@ -39,6 +59,8 @@ export default function ClassRoadmapPanel({ classId, cls }: { classId: string; c
   const [currentLesson, setCurrentLesson] = useState(0);
   const [teacherName, setTeacherName] = useState("");
   const [assistantName, setAssistantName] = useState("");
+  const [content, setContent] = useState("");    // Nội dung học (đầu)
+  const [homework, setHomework] = useState("");   // BTVN (cuối)
   const [rows, setRows] = useState<Row[]>([]);
   const cardRef = useRef<HTMLDivElement | null>(null);
 
@@ -60,17 +82,20 @@ export default function ClassRoadmapPanel({ classId, cls }: { classId: string; c
       const d = res.data;
       setTeacherName(d.teacherName || d.defaultTeacher || "");
       setAssistantName(d.assistantName || "");
+      setContent(d.content || "");
+      setHomework(d.homework || "");
       setProgramKey(d.programKey || guessProgram(d.course || cls?.course));
       setCurrentLesson(d.currentLesson || 0);
       const list = Array.isArray(d.students) ? d.students : [];
-      setRows(list.map((s: any) => ({
+      const mapped: Row[] = list.map((s: any) => ({
         name: s.name || "",
         attend: s.attend || "",
         warmup: s.warmup || "",
         classScore: s.classScore != null ? String(s.classScore) : (s.score != null ? String(s.score) : ""),
         homework: s.homework || "",
         comment: s.comment || "",
-      })));
+      }));
+      setRows(sortByName(mapped));   // sort A-Z theo tên ngay khi tải
     }
     setLoading(false);
   }, [classId, date, cls]);
@@ -81,6 +106,7 @@ export default function ClassRoadmapPanel({ classId, cls }: { classId: string; c
   }
   function addRow() { setRows((prev) => [...prev, { name: "", attend: "", warmup: "", classScore: "", homework: "", comment: "" }]); }
   function removeRow(i: number) { setRows((prev) => prev.filter((_, idx) => idx !== i)); }
+  function resort() { setRows((prev) => sortByName(prev)); }   // nút sắp xếp lại sau khi thêm tên tay
 
   async function save() {
     setSaving(true);
@@ -88,6 +114,7 @@ export default function ClassRoadmapPanel({ classId, cls }: { classId: string; c
       classId, date,
       programKey, currentLesson,
       teacherName, assistantName,
+      content, homework,
       students: rows.filter((r) => r.name.trim() !== ""),
     });
     setSaving(false);
@@ -141,16 +168,26 @@ export default function ClassRoadmapPanel({ classId, cls }: { classId: string; c
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-gold" /></div>
       ) : (
-        <div className="card mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-1.5 block text-xs font-bold text-muted">Giáo viên</label>
-            <input value={teacherName} onChange={(e) => setTeacherName(e.target.value)} placeholder="Tên GV" className="input-field" />
+        <>
+          <div className="card mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-bold text-muted">Giáo viên</label>
+              <input value={teacherName} onChange={(e) => setTeacherName(e.target.value)} placeholder="Tên GV" className="input-field" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-bold text-muted">Trợ giảng</label>
+              <input value={assistantName} onChange={(e) => setAssistantName(e.target.value)} placeholder="Tên trợ giảng" className="input-field" />
+            </div>
           </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-bold text-muted">Trợ giảng</label>
-            <input value={assistantName} onChange={(e) => setAssistantName(e.target.value)} placeholder="Tên trợ giảng" className="input-field" />
+
+          {/* NỘI DUNG HỌC — đầu diary */}
+          <div className="card mb-4">
+            <label className="mb-1.5 block text-xs font-bold text-muted">① Nội dung học buổi này</label>
+            <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={3}
+              placeholder="Mỗi dòng = 1 gạch đầu dòng&#10;VD:&#10;Ngữ pháp: thì hiện tại hoàn thành&#10;Luyện viết đoạn 80 từ" className="input-field" />
+            <p className="mt-1 text-[0.7rem] text-muted">Mỗi dòng = 1 gạch đầu dòng.</p>
           </div>
-        </div>
+        </>
       )}
 
       {/* Bố cục nhập liệu: lộ trình trái + điểm danh phải */}
@@ -164,26 +201,31 @@ export default function ClassRoadmapPanel({ classId, cls }: { classId: string; c
         <div className="card !p-3">
           <div className="mb-2 flex items-center justify-between">
             <div className="text-xs font-bold uppercase tracking-wide text-muted">Điểm danh & Nhận xét</div>
-            <span className="text-[0.7rem] text-muted">{rows.length} HV · tự lấy từ lớp, sửa được</span>
+            <div className="flex items-center gap-2">
+              <button onClick={resort} className="text-[0.7rem] font-medium text-gold hover:underline">Sắp xếp A-Z</button>
+              <span className="text-[0.7rem] text-muted">{rows.length} HV</span>
+            </div>
           </div>
-          <div className="overflow-x-auto">
+          {/* Bảng cuộn dọc, header dính (sticky) */}
+          <div className="max-h-[60vh] overflow-auto rounded-lg border border-silver/20">
             <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-silver/30 text-left text-muted">
-                  <th className="py-1.5 pr-2 font-semibold">Học viên</th>
-                  <th className="px-1 font-semibold">Điểm danh</th>
-                  <th className="px-1 font-semibold">Từ đầu giờ</th>
-                  <th className="px-1 font-semibold">Điểm lớp</th>
-                  <th className="px-1 font-semibold">Bài về nhà</th>
-                  <th className="px-1 font-semibold">Nhận xét</th>
-                  <th className="w-6"></th>
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-royal text-left text-white">
+                  <th className="sticky left-0 z-20 bg-royal py-2 px-2 font-semibold">Học viên</th>
+                  <th className="px-1 py-2 font-semibold">Điểm danh</th>
+                  <th className="px-1 py-2 font-semibold">Từ đầu giờ</th>
+                  <th className="px-1 py-2 font-semibold">Điểm lớp</th>
+                  <th className="px-1 py-2 font-semibold">Bài về nhà</th>
+                  <th className="px-1 py-2 font-semibold">Nhận xét</th>
+                  <th className="w-6 bg-royal"></th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r, i) => (
-                  <tr key={i} className="border-b border-silver/10 align-top">
-                    <td className="py-1.5 pr-2">
+                  <tr key={i} className="border-b border-silver/10 align-top even:bg-cream/30">
+                    <td className="sticky left-0 z-10 bg-inherit py-1.5 px-2">
                       <input value={r.name} onChange={(e) => setRow(i, "name", e.target.value)} placeholder="Tên"
+                        title={r.name}
                         className="w-full min-w-[90px] rounded border border-silver/40 px-1.5 py-1 outline-none focus:border-gold" />
                     </td>
                     <td className="px-1">
@@ -207,6 +249,16 @@ export default function ClassRoadmapPanel({ classId, cls }: { classId: string; c
         </div>
       </div>
 
+      {/* BÀI TẬP VỀ NHÀ — cuối diary */}
+      {!loading && (
+        <div className="card mt-4">
+          <label className="mb-1.5 block text-xs font-bold text-muted">③ Bài tập về nhà & dặn dò</label>
+          <textarea value={homework} onChange={(e) => setHomework(e.target.value)} rows={3}
+            placeholder="Mỗi dòng = 1 gạch đầu dòng&#10;VD:&#10;Hoàn thành Unit 2 - Reading (trang 24-25)&#10;Học 20 từ vựng chủ đề Transportation" className="input-field" />
+          <p className="mt-1 text-[0.7rem] text-muted">Mỗi dòng = 1 gạch đầu dòng.</p>
+        </div>
+      )}
+
       {/* Thẻ xuất PNG — hiện khi Xem trước; luôn render off-screen để Xuất ảnh chụp được */}
       <div className={showPreview ? "mt-5 overflow-x-auto" : "pointer-events-none fixed -left-[9999px] top-0"}>
         <RoadmapCard
@@ -219,21 +271,23 @@ export default function ClassRoadmapPanel({ classId, cls }: { classId: string; c
           currentLesson={currentLesson}
           currentLabel={curLabel}
           rows={filledRows}
+          contentLines={toLines(content)}
+          homeworkLines={toLines(homework)}
         />
       </div>
     </div>
   );
 }
 
-// ───────── Thẻ xuất PNG: header VESTA + lộ trình trái + bảng điểm danh phải ─────────
-function RoadmapCard({ cardRef, className, dateVN, teacherName, assistantName, prog, currentLesson, currentLabel, rows }: {
+// ───────── Thẻ xuất PNG: header + Nội dung học + lộ trình trái + bảng phải + BTVN ─────────
+function RoadmapCard({ cardRef, className, dateVN, teacherName, assistantName, prog, currentLesson, currentLabel, rows, contentLines, homeworkLines }: {
   cardRef: React.RefObject<HTMLDivElement | null>;
   className: string; dateVN: string; teacherName: string; assistantName: string;
   prog?: Program; currentLesson: number; currentLabel: string; rows: Row[];
+  contentLines: string[]; homeworkLines: string[];
 }) {
   const flat = prog ? flatten(prog) : [];
 
-  // Dựng lộ trình dạng nhóm cho thẻ (unit / section / buổi)
   function renderRail() {
     if (!prog) return null;
     const line = (n: number, text: string, indent = false) => {
@@ -253,9 +307,7 @@ function RoadmapCard({ cardRef, className, dateVN, teacherName, assistantName, p
       );
     };
     let running = 0;
-    if (prog.flatItems) {
-      return <div>{flat.map((l) => line(l.n, l.label))}</div>;
-    }
+    if (prog.flatItems) return <div>{flat.map((l) => line(l.n, l.label))}</div>;
     if (prog.sections) {
       return (
         <div>
@@ -289,7 +341,7 @@ function RoadmapCard({ cardRef, className, dateVN, teacherName, assistantName, p
         <img src="/logo-vesta-01.jpg" alt="VESTA" crossOrigin="anonymous" style={{ width: 84, height: 84, flex: "none", objectFit: "contain" }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 3, color: GOLD_DARK }}>VESTA UNI · SINCE 2012</div>
-          <div style={{ fontSize: 26, fontWeight: 800, color: "#111122", letterSpacing: 1, margin: "3px 0 4px", fontFamily: "Georgia, serif" }}>LỘ TRÌNH HỌC TẬP</div>
+          <div style={{ fontSize: 26, fontWeight: 800, color: "#111122", letterSpacing: 1, margin: "3px 0 4px", fontFamily: "Georgia, serif" }}>NHẬT KÝ LỚP HỌC</div>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2.4, textTransform: "uppercase", color: GOLD_DARK }}>{prog?.name || ""}{prog?.meta ? ` · ${prog.meta}` : ""}</div>
         </div>
         <div style={{ flex: "none", minWidth: 180, background: "rgba(255,255,255,.9)", border: `1px solid ${GOLD}`, borderRadius: 12, padding: "9px 13px", fontSize: 12 }}>
@@ -302,16 +354,23 @@ function RoadmapCard({ cardRef, className, dateVN, teacherName, assistantName, p
         </div>
       </div>
 
+      {/* NỘI DUNG HỌC */}
+      {contentLines.length > 0 && (
+        <div style={{ padding: "14px 30px 0" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: GOLD_DARK, marginBottom: 6 }}>Nội dung học</div>
+          <ul style={{ margin: 0, paddingLeft: 20 }}>
+            {contentLines.map((l, i) => <li key={i} style={{ marginBottom: 4, lineHeight: 1.5, fontSize: 12.5 }}>{l}</li>)}
+          </ul>
+        </div>
+      )}
+
       {/* Thân: lộ trình trái + bảng phải */}
-      <div style={{ display: "flex", gap: 0, alignItems: "stretch" }}>
-        {/* Lộ trình trái */}
-        <div style={{ width: 280, flex: "none", background: "#FAFAF7", borderRight: `1px solid ${GOLD}`, padding: "16px 14px" }}>
+      <div style={{ display: "flex", gap: 0, alignItems: "stretch", padding: "14px 0 0" }}>
+        <div style={{ width: 280, flex: "none", background: "#FAFAF7", borderRight: `1px solid ${GOLD}`, borderTop: `1px solid ${GOLD}`, padding: "16px 14px" }}>
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: GOLD_DARK, marginBottom: 10 }}>Lộ trình khoá học</div>
           {renderRail()}
         </div>
-
-        {/* Bảng điểm danh phải */}
-        <div style={{ flex: 1, padding: "16px 22px" }}>
+        <div style={{ flex: 1, padding: "16px 22px", borderTop: `1px solid ${GOLD}` }}>
           {currentLabel && (
             <div style={{ marginBottom: 12, padding: "8px 12px", background: "rgba(27,42,91,.06)", borderLeft: `3px solid ${BLUE}`, borderRadius: "0 6px 6px 0" }}>
               <span style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: .8, color: GOLD_DARK }}>Buổi hôm nay · </span>
@@ -333,7 +392,7 @@ function RoadmapCard({ cardRef, className, dateVN, teacherName, assistantName, p
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={i} style={{ borderBottom: "1px solid #EEE" }}>
-                    <td style={{ padding: "6px 8px", fontWeight: 600 }}>{r.name}</td>
+                    <td style={{ padding: "6px 8px", fontWeight: 600 }}>{abbrevName(r.name)}</td>
                     <td style={{ padding: "6px 6px", textAlign: "center" }}>{ATTEND_LABEL[r.attend] || "—"}</td>
                     <td style={{ padding: "6px 6px", textAlign: "center" }}>{r.warmup || "—"}</td>
                     <td style={{ padding: "6px 6px", textAlign: "center" }}>
@@ -349,8 +408,18 @@ function RoadmapCard({ cardRef, className, dateVN, teacherName, assistantName, p
         </div>
       </div>
 
+      {/* BÀI TẬP VỀ NHÀ */}
+      {homeworkLines.length > 0 && (
+        <div style={{ padding: "16px 30px 4px" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: GOLD_DARK, marginBottom: 6 }}>Bài tập về nhà & dặn dò</div>
+          <ul style={{ margin: 0, paddingLeft: 20, background: "#FFFBF0", borderLeft: `3px solid ${GOLD}`, padding: "12px 12px 12px 30px", borderRadius: "0 8px 8px 0" }}>
+            {homeworkLines.map((l, i) => <li key={i} style={{ marginBottom: 4, lineHeight: 1.5, fontSize: 12.5 }}>{l}</li>)}
+          </ul>
+        </div>
+      )}
+
       {/* Footer */}
-      <div style={{ background: "#FAF6EE", borderTop: `2px solid ${GOLD}`, padding: "14px 30px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11.5 }}>
+      <div style={{ background: "#FAF6EE", borderTop: `2px solid ${GOLD}`, padding: "14px 30px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11.5, marginTop: 14 }}>
         <div>
           <div style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800, color: BLUE }}>VESTA UNI</div>
           <div style={{ fontStyle: "italic", color: GOLD_DARK, fontSize: 10.5 }}>Học Nhanh Thi Chắc · Phá Tắc Band</div>
