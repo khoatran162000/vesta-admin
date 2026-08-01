@@ -15,15 +15,20 @@ const STAFF_PEOPLE = [...GV, ...TA, "MS. NGỌC"];
 const ROOMS = ["Phòng 1 · To", "Phòng 2 · VIP", "Phòng 3 · Ngoài"];
 const DAYS = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"];
 const SLOTS = [
-  { id: "morning", name: "Sáng 08:00", time: "08:00–10:00" },
-  { id: "morning9", name: "Sáng 09:00", time: "09:00–11:00" },
-  { id: "morning2", name: "Sáng 10:00", time: "10:00–12:00" },
-  { id: "afternoon", name: "Chiều 13:00", time: "13:00–15:00" },
-  { id: "afternoon2", name: "Chiều 15:00", time: "15:00–17:00" },
-  { id: "evening17", name: "Chiều 17:00", time: "17:00–19:00" },
-  { id: "early", name: "Tối 18:00", time: "18:00–20:00" },
-  { id: "evening19", name: "Tối 19:00", time: "19:00–21:00" },
-  { id: "late", name: "Tối 20:00", time: "20:00–22:00" },
+  { id: "h8", name: "08:00", time: "08:00–09:00" },
+  { id: "h9", name: "09:00", time: "09:00–10:00" },
+  { id: "h10", name: "10:00", time: "10:00–11:00" },
+  { id: "h11", name: "11:00", time: "11:00–12:00" },
+  { id: "h12", name: "12:00", time: "12:00–13:00" },
+  { id: "h13", name: "13:00", time: "13:00–14:00" },
+  { id: "h14", name: "14:00", time: "14:00–15:00" },
+  { id: "h15", name: "15:00", time: "15:00–16:00" },
+  { id: "h16", name: "16:00", time: "16:00–17:00" },
+  { id: "h17", name: "17:00", time: "17:00–18:00" },
+  { id: "h18", name: "18:00", time: "18:00–19:00" },
+  { id: "h19", name: "19:00", time: "19:00–20:00" },
+  { id: "h20", name: "20:00", time: "20:00–21:00" },
+  { id: "h21", name: "21:00", time: "21:00–22:00" },
 ];
 const DAY_PRESETS = [
   { label: "T2·T4·T6", days: [0, 2, 4] },
