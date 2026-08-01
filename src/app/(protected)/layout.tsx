@@ -13,7 +13,7 @@ import { useAuth, ROLE_LABELS } from "@/hooks/useAuth";
 const ADMIN = ["ADMIN"];
 const STAFF = ["ADMIN", "TEACHER"];
 const CMS = ["ADMIN", "CONTENT_CREATOR"];   // giống cmsRoles bên post.routes
-type NavChild = { href: string; label: string; roles?: string[] };
+type NavChild = { href: string; label: string; roles?: string[]; badgeKey?: string };
 type NavLink = { href: string; label: string; icon: any; roles?: string[]; badgeKey?: string };
 type NavGroup = { label: string; icon: any; children: NavChild[]; roles?: string[] };
 type NavItem = NavLink | NavGroup;
@@ -45,7 +45,7 @@ const NAV: NavItem[] = [
     { href: "/noi-dung-trang-chu", label: "Nội dung trang chủ", roles: CMS },
     { href: "/huong-dan-nhap-hoc", label: "Hướng dẫn nhập học", roles: CMS },
     { href: "/tai-lieu", label: "Tài liệu (bán)", roles: CMS },
-    { href: "/don-hang", label: "Đơn hàng", roles: CMS },
+    { href: "/don-hang", label: "Đơn hàng", roles: CMS, badgeKey: "orders" },
   ]},
   { href: "/theo-doi", label: "Theo dõi học viên", icon: GraduationCap, roles: STAFF },
   { href: "/theo-doi/ky-luat", label: "Kỷ luật học tập", icon: ShieldAlert, roles: STAFF },
@@ -64,6 +64,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [openMenus, setOpenMenus] = useState<string[]>([]);
   const [consultCount, setConsultCount] = useState(0);
+  const [orderCount, setOrderCount] = useState(0);
   useEffect(() => {
     if (!loading && !user) router.replace("/dang-nhap");
   }, [loading, user, router]);
@@ -80,6 +81,21 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     }
     loadCount();
     const t = setInterval(loadCount, 60000);
+    return () => { alive = false; clearInterval(t); };
+  }, [loading, user, pathname]);
+  // Đếm đơn hàng chờ xử lý (PENDING + PAID chưa giao) — badge menu Đơn hàng, CMS role đều thấy
+  useEffect(() => {
+    const can = user?.role === "ADMIN" || user?.role === "CONTENT_CREATOR";
+    if (loading || !can) return;
+    let alive = true;
+    async function loadOrderCount() {
+      try {
+        const res = await api.get("/orders/count-pending");
+        if (alive && res.success) setOrderCount(res.data.count || 0);
+      } catch {}
+    }
+    loadOrderCount();
+    const t = setInterval(loadOrderCount, 60000);
     return () => { alive = false; clearInterval(t); };
   }, [loading, user, pathname]);
   function toggleMenu(label: string) {
@@ -104,7 +120,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     })
     .filter((item) => "href" in item || (item as NavGroup).children.length > 0);
   // Số badge theo key
-  const badgeFor = (key?: string) => (key === "consultation" ? consultCount : 0);
+  const badgeFor = (key?: string) => (key === "consultation" ? consultCount : key === "orders" ? orderCount : 0);
   return (
     <div className="flex min-h-screen bg-cream">
       <aside className="sticky top-0 flex h-screen w-[240px] shrink-0 flex-col border-r border-silver/30 bg-white">
@@ -155,10 +171,16 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
                   <div className="ml-7 mt-0.5 space-y-0.5 border-l border-silver/20 pl-3">
                     {group.children.map((child) => {
                       const active = pathname === child.href || pathname.startsWith(child.href + "/");
+                      const cbadge = badgeFor(child.badgeKey);
                       return (
                         <Link key={child.href} href={child.href}
-                          className={`block rounded-md px-2.5 py-1.5 text-[0.78rem] transition-colors ${active ? "font-semibold text-royal" : "text-muted hover:text-royal"}`}>
-                          {child.label}
+                          className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[0.78rem] transition-colors ${active ? "font-semibold text-royal" : "text-muted hover:text-royal"}`}>
+                          <span className="flex-1">{child.label}</span>
+                          {cbadge > 0 && (
+                            <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[0.6rem] font-bold text-white">
+                              {cbadge > 99 ? "99+" : cbadge}
+                            </span>
+                          )}
                         </Link>
                       );
                     })}
