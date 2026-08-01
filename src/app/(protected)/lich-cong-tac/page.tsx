@@ -31,7 +31,7 @@ const DAY_PRESETS = [
   { label: "T2→T6", days: [0, 1, 2, 3, 4] },
   { label: "Cả tuần", days: [0, 1, 2, 3, 4, 5, 6] },
 ];
-// Màu chip theo người (8 tông VESTA-ish)
+// Màu chip theo người (8 tông)
 const PERSON_TONES: Record<string, number> = { "MS. LY": 0, "MR. TÀI": 1, "MR. D.A.": 2, "MR. TIẾN": 3, "MS. NGÂN": 4, "MR. DUY": 5, "MS. QUỲNH": 6, "MS. NGỌC": 7 };
 const TONE_BG = ["#1B2A5B", "#A6882E", "#B22234", "#2A7D6F", "#7A4E9E", "#3B6FB0", "#C0653A", "#5A6570"];
 function toneIdx(name: string): number {
@@ -97,6 +97,7 @@ export default function LichCongTacPage() {
     if (!exportRef.current) return;
     setExporting(true);
     try {
+      await new Promise((r) => setTimeout(r, 120));   // đợi ẩn nút +/x rồi mới chụp
       const html2canvas = (await import("html2canvas-pro")).default;
       const canvas = await html2canvas(exportRef.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
       const link = document.createElement("a");
@@ -139,9 +140,9 @@ export default function LichCongTacPage() {
             ["Nhiệm vụ", tasks.length],
             ["Hoàn thành", `${tasks.length ? Math.round(done / tasks.length * 100) : 0}%`],
           ].map(([label, val]) => (
-            <div key={label as string} className="rounded-xl bg-gradient-to-br from-royal to-[#2A3F7A] px-4 py-3 text-white">
-              <div className="text-2xl font-extrabold">{val}</div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-white/70">{label}</div>
+            <div key={label as string} className="min-w-0 rounded-xl bg-gradient-to-br from-royal to-[#2A3F7A] px-3 py-2.5 text-white sm:px-4 sm:py-3">
+              <div className="text-xl font-extrabold sm:text-2xl">{val}</div>
+              <div className="break-words text-[10px] font-semibold uppercase leading-tight text-white/70 sm:text-xs">{label}</div>
             </div>
           ))}
         </div>
@@ -182,9 +183,9 @@ export default function LichCongTacPage() {
                                 <div className="text-sm font-bold text-[#1a1a2e]">{x.className}</div>
                                 <div className="mt-1 flex flex-wrap gap-1">{people.slice(0, 3).map((n) => <PersonChip key={n} name={n} small />)}{people.length > 3 && <span className="text-[11px] text-muted">+{people.length - 3}</span>}</div>
                               </button>
-                              {isAdmin && <button onClick={() => del("schedule", x.id)} className="absolute -right-1.5 -top-1.5 hidden rounded-full bg-red-500 p-0.5 text-white group-hover:block"><X size={12} /></button>}
+                              {isAdmin && !exporting && <button onClick={() => del("schedule", x.id)} className="absolute -right-1.5 -top-1.5 rounded-full bg-red-500 p-0.5 text-white shadow-md"><X size={12} /></button>}
                             </div>
-                          ) : isAdmin ? (
+                          ) : isAdmin && !exporting ? (
                             <button onClick={() => setModal({ type: "schedule", day, slot: slot.id, room })}
                               className="flex h-full min-h-[44px] w-full items-center justify-center rounded-lg border border-dashed border-silver/40 text-xs text-muted hover:border-gold/50 hover:bg-gold/5"><Plus size={13} /></button>
                           ) : null}
@@ -204,7 +205,7 @@ export default function LichCongTacPage() {
                   <div className="text-lg font-bold text-royal">Công việc đội ngũ</div>
                   <div className="text-xs text-muted">{tasks.filter((x) => !x.completed).length} việc đang chờ</div>
                 </div>
-                {isAdmin && <button onClick={() => setModal({ type: "task" })} className="btn-primary text-sm"><Plus size={15} />Thêm</button>}
+                {isAdmin && !exporting && <button onClick={() => setModal({ type: "task" })} className="btn-primary text-sm"><Plus size={15} />Thêm</button>}
               </div>
               <div className="space-y-2">
                 {tasks.length === 0 ? <div className="py-8 text-center text-sm text-muted">Chưa có nhiệm vụ.</div> :
@@ -216,14 +217,14 @@ export default function LichCongTacPage() {
                           {t.completed && <Check size={13} />}
                         </button>
                         <div className="min-w-0 flex-1">
-                          <div className={`text-sm font-bold text-[#1a1a2e] ${t.completed ? "line-through" : ""}`}>{t.title}</div>
-                          {t.note && <div className="text-xs text-muted">{t.note}</div>}
+                          <div className={`break-words text-sm font-bold text-[#1a1a2e] ${t.completed ? "line-through" : ""}`}>{t.title}</div>
+                          {t.note && <div className="break-all text-xs text-muted">{t.note}</div>}
                           <div className="mt-1 flex flex-wrap items-center gap-1.5">
                             {uniq([t.owner, ...parseTags(t.tags)]).map((n) => <PersonChip key={n} name={n} small />)}
                             <span className={`ml-auto text-[11px] font-semibold ${t.deadline < isoLocal() && !t.completed ? "text-red-600" : "text-muted"}`}>DL {fmt(t.deadline)}</span>
                           </div>
                         </div>
-                        {isAdmin && (
+                        {isAdmin && !exporting && (
                           <div className="flex shrink-0 flex-col gap-1">
                             <button onClick={() => setModal({ type: "task", item: t })} className="rounded p-1 text-xs text-muted hover:text-royal">Sửa</button>
                             <button onClick={() => del("task", t.id)} className="rounded p-1 text-muted hover:text-red-600"><Trash2 size={13} /></button>
@@ -251,18 +252,18 @@ function Editor({ modal, week, close, saved, notify }: { modal: any; week: strin
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [customTag, setCustomTag] = useState("");
-  function addCustomTag() {
-    const name = customTag.trim();
-    if (!name) return;
-    set("tags", uniq([...f.tags, name]));   // thêm vào tag, không trùng
-    setCustomTag("");
-  }
   const [f, setF] = useState<any>(isS
     ? { weekStart: week, dayIndices: [modal.day ?? old.dayIndex ?? 0], slot: modal.slot ?? old.slot ?? "morning", room: modal.room ?? old.room ?? ROOMS[0], className: old.className ?? "", teacher: old.teacher ?? GV[0], assistant: old.assistant ?? "", tags: parseTags(old.tags), note: old.note ?? "" }
-    : { weekStart: week, title: old.title ?? "", owner: old.owner ?? STAFF_PEOPLE[0], tags: parseTags(old.tags), deadline: old.deadline ?? week, note: old.note ?? "", completed: old.completed ?? false });
+    : { weekStart: week, title: old.title ?? "", owner: old.owner ?? STAFF_PEOPLE[0], tags: parseTags(old.tags), deadline: old.deadline ?? isoLocal(), note: old.note ?? "", completed: old.completed ?? false });
   const set = (k: string, v: any) => setF((p: any) => ({ ...p, [k]: v }));
   const toggleDay = (i: number) => set("dayIndices", f.dayIndices.includes(i) ? f.dayIndices.filter((x: number) => x !== i) : [...f.dayIndices, i].sort());
   const toggleTag = (name: string) => set("tags", f.tags.includes(name) ? f.tags.filter((x: string) => x !== name) : [...f.tags, name]);
+  function addCustomTag() {
+    const name = customTag.trim();
+    if (!name) return;
+    set("tags", uniq([...f.tags, name]));   // thêm tên nhân sự mới, không trùng
+    setCustomTag("");
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -344,14 +345,12 @@ function Editor({ modal, week, close, saved, notify }: { modal: any; week: strin
         <fieldset className="mb-3 rounded-lg border border-silver/30 p-3">
           <legend className="px-1 text-xs font-bold text-muted">Tag thêm nhân sự</legend>
           <div className="flex flex-wrap gap-1.5">
-            {/* gộp danh sách sẵn + tên đã tag (kể cả tên mới) để không sót nút */}
             {uniq([...STAFF_PEOPLE, ...f.tags]).map((name) => (
               <button type="button" key={name} onClick={() => toggleTag(name)}
                 style={f.tags.includes(name) ? { background: TONE_BG[toneIdx(name)] } : {}}
                 className={`rounded-full px-2.5 py-1 text-xs font-semibold ${f.tags.includes(name) ? "text-white" : "bg-cream text-muted hover:bg-cream-dark"}`}>{name}</button>
             ))}
           </div>
-          {/* Ô thêm tên nhân sự mới */}
           <div className="mt-2 flex gap-2">
             <input value={customTag} onChange={(e) => setCustomTag(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomTag(); } }}
