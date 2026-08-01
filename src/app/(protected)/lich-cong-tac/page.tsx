@@ -250,6 +250,13 @@ function Editor({ modal, week, close, saved, notify }: { modal: any; week: strin
   const old = modal.item ?? {};
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [customTag, setCustomTag] = useState("");
+  function addCustomTag() {
+    const name = customTag.trim();
+    if (!name) return;
+    set("tags", uniq([...f.tags, name]));   // thêm vào tag, không trùng
+    setCustomTag("");
+  }
   const [f, setF] = useState<any>(isS
     ? { weekStart: week, dayIndices: [modal.day ?? old.dayIndex ?? 0], slot: modal.slot ?? old.slot ?? "morning", room: modal.room ?? old.room ?? ROOMS[0], className: old.className ?? "", teacher: old.teacher ?? GV[0], assistant: old.assistant ?? "", tags: parseTags(old.tags), note: old.note ?? "" }
     : { weekStart: week, title: old.title ?? "", owner: old.owner ?? STAFF_PEOPLE[0], tags: parseTags(old.tags), deadline: old.deadline ?? week, note: old.note ?? "", completed: old.completed ?? false });
@@ -333,15 +340,23 @@ function Editor({ modal, week, close, saved, notify }: { modal: any; week: strin
           </>
         )}
 
-        {/* Tag người (chung cho cả 2) */}
+        {/* Tag người (chung cho cả 2) — chọn sẵn + thêm tên mới */}
         <fieldset className="mb-3 rounded-lg border border-silver/30 p-3">
           <legend className="px-1 text-xs font-bold text-muted">Tag thêm nhân sự</legend>
           <div className="flex flex-wrap gap-1.5">
-            {STAFF_PEOPLE.map((name) => (
+            {/* gộp danh sách sẵn + tên đã tag (kể cả tên mới) để không sót nút */}
+            {uniq([...STAFF_PEOPLE, ...f.tags]).map((name) => (
               <button type="button" key={name} onClick={() => toggleTag(name)}
                 style={f.tags.includes(name) ? { background: TONE_BG[toneIdx(name)] } : {}}
                 className={`rounded-full px-2.5 py-1 text-xs font-semibold ${f.tags.includes(name) ? "text-white" : "bg-cream text-muted hover:bg-cream-dark"}`}>{name}</button>
             ))}
+          </div>
+          {/* Ô thêm tên nhân sự mới */}
+          <div className="mt-2 flex gap-2">
+            <input value={customTag} onChange={(e) => setCustomTag(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomTag(); } }}
+              placeholder="Nhập tên nhân sự mới..." className="input-field flex-1 !py-1.5 text-sm" />
+            <button type="button" onClick={addCustomTag} className="btn-secondary shrink-0 text-sm"><Plus size={14} />Thêm</button>
           </div>
         </fieldset>
 
