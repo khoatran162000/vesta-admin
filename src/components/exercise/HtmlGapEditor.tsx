@@ -1,15 +1,14 @@
 // FILE: src/components/exercise/HtmlGapEditor.tsx
 // Editor gap giữ NGUYÊN HTML (bảng, màu, iframe) — contentEditable thuần, giống LearnClick.
-// Không dùng TipTap vì StarterKit nuốt sạch table/style/iframe.
 "use client";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { importLearnClickHtml } from "@/lib/learnclickImport";
 import { api, getImageUrl } from "@/lib/api";
-import { Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, AlignJustify, RemoveFormatting } from "lucide-react";
+import { Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, AlignJustify, RemoveFormatting, Undo2 } from "lucide-react";
 export type GapType = "TEXT" | "DROPDOWN" | "DRAG";
 export interface GapDef { type: GapType; answers: string[]; options?: string[]; hint?: string }
 export interface GapData { content: string; gaps: Record<string, GapDef> }
-export interface HtmlGapEditorHandle { getData: () => GapData }  // trang cha gọi lúc Lưu để lấy đúng nội dung từ DOM
+export interface HtmlGapEditorHandle { getData: () => GapData }
 interface Props {
   initial?: GapData;
   onChange?: (d: GapData) => void;
@@ -21,7 +20,6 @@ function escAttr(s: string) {
 function escText(s: string) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-// Style inline (không dùng class Tailwind — chip nằm trong innerHTML, tránh bị purge)
 const CHIP_STYLE: Record<GapType, string> = {
   TEXT: "background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;",
   DROPDOWN: "background:#f3e8ff;color:#7e22ce;border:1px solid #d8b4fe;",
@@ -56,13 +54,15 @@ interface Editing { id: string; type: GapType; answers: string; options: string;
 const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEditor({ initial, onChange }, ref) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const imgInputRef = useRef<HTMLInputElement | null>(null);
-  const savedRange = useRef<Range | null>(null);   // lưu vị trí con trỏ trước khi mở dialog ảnh
+  const savedRange = useRef<Range | null>(null);
   const [pasteBox, setPasteBox] = useState("");
   const [showPaste, setShowPaste] = useState(!initial?.content);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [count, setCount] = useState(0);
   const [uploadingImg, setUploadingImg] = useState(false);
-  // Trang cha gọi lúc Lưu — đọc nội dung THẲNG TỪ DOM (không phụ thuộc state có thể lệch sau chèn/xoá ảnh)
+  // ── Undo stack (thao tác gap không vào undo của trình duyệt → tự quản) ──
+  const undoStack = useRef<string[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
   useImperativeHandle(ref, () => ({
     getData: () => {
       const host = hostRef.current;
@@ -77,7 +77,22 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     setCount(Object.keys(data.gaps).length);
     onChange?.(data);
   }, [onChange]);
-  // Nạp nội dung ban đầu (1 lần) — React KHÔNG quản lý innerHTML của vùng này
+  // Lưu ảnh chụp innerHTML TRƯỚC mỗi thao tác gap (để hoàn tác)
+  const pushUndo = useCallback(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    undoStack.current.push(host.innerHTML);
+    if (undoStack.current.length > 40) undoStack.current.shift();
+    setCanUndo(true);
+  }, []);
+  const undo = useCallback(() => {
+    const host = hostRef.current;
+    if (!host || undoStack.current.length === 0) return;
+    const prev = undoStack.current.pop()!;
+    host.innerHTML = prev;
+    setCanUndo(undoStack.current.length > 0);
+    emit();
+  }, [emit]);
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -98,7 +113,6 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     tmp.innerHTML = chipHtml(id, type, answers, options, hint);
     return tmp.firstElementChild as HTMLElement;
   }
-  // ─── Định dạng chữ (execCommand) — áp lên phần bôi đen trong editor ───
   function exec(command: string, value?: string) {
     const host = hostRef.current;
     if (!host) return;
@@ -110,7 +124,6 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     const host = hostRef.current;
     if (!host || !px) return;
     host.focus();
-    // execCommand fontSize dùng thang 1-7; để đặt px chính xác, bọc selection bằng span style.
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
     const range = sel.getRangeAt(0);
@@ -124,7 +137,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     } catch {}
     emit();
   }
-  // Bôi đen → tạo gap (Cmd+G / Ctrl+G hoặc bấm nút)
+  // Bôi đen → tạo gap
   const makeGap = useCallback((type: GapType) => {
     const host = hostRef.current;
     if (!host) return;
@@ -137,28 +150,56 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     if (!host.contains(range.commonAncestorContainer)) return;
     const text = sel.toString().trim();
     if (!text) return;
+    pushUndo();
     const id = String(nextId(host));
     const chip = buildChipEl(id, type, text, type === "DROPDOWN" ? text : "");
     range.deleteContents();
     range.insertNode(chip);
     sel.removeAllRanges();
     emit();
-  }, [emit]);
-  // Phím tắt: Cmd/Ctrl+G = ô điền, +D = dropdown, +K = kéo-thả
+  }, [emit, pushUndo]);
+  // ── #2 Đổi dạng TẤT CẢ chip nằm trong vùng bôi đen ──
+  const changeSelectedGaps = useCallback((type: GapType) => {
+    const host = hostRef.current;
+    if (!host) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      alert("Hãy bôi đen vùng chứa các chỗ trống cần đổi dạng");
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    if (!host.contains(range.commonAncestorContainer)) return;
+    // các chip giao với vùng chọn
+    const chips = Array.from(host.querySelectorAll<HTMLElement>("span.vgap")).filter((el) => range.intersectsNode(el));
+    if (!chips.length) { alert("Vùng chọn không có chỗ trống nào"); return; }
+    if (!confirm(`Đổi ${chips.length} chỗ trống sang dạng ${type === "TEXT" ? "Ô điền" : type === "DROPDOWN" ? "Dropdown" : "Kéo-thả"}?`)) return;
+    pushUndo();
+    chips.forEach((el) => {
+      const id = el.getAttribute("data-gap-id") || "";
+      const answers = el.getAttribute("data-answers") || "";
+      const options = el.getAttribute("data-options") || (type === "DROPDOWN" ? answers : "");
+      const hint = el.getAttribute("data-hint") || "";
+      el.replaceWith(buildChipEl(id, type, answers, options, hint));
+    });
+    sel.removeAllRanges();
+    emit();
+  }, [emit, pushUndo]);
+  // Phím tắt: ⌘G/⌘D/⌘K tạo gap; ⌘⇧Z hoàn tác gap
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
     function onKey(e: KeyboardEvent) {
       if (!(e.metaKey || e.ctrlKey)) return;
       const k = e.key.toLowerCase();
+      if (e.shiftKey && k === "z") { e.preventDefault(); undo(); return; }
+      if (e.shiftKey) return;
       if (k === "g") { e.preventDefault(); makeGap("TEXT"); }
       else if (k === "d") { e.preventDefault(); makeGap("DROPDOWN"); }
       else if (k === "k") { e.preventDefault(); makeGap("DRAG"); }
     }
     host.addEventListener("keydown", onKey);
     return () => host.removeEventListener("keydown", onKey);
-  }, [makeGap]);
-  // Lưu vị trí con trỏ hiện tại (trong editor) — gọi trước khi mở file dialog.
+  }, [makeGap, undo]);
   function rememberCursor() {
     const host = hostRef.current;
     const sel = window.getSelection();
@@ -171,12 +212,10 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     }
     savedRange.current = null;
   }
-  // Bấm nút "Chèn ảnh" → nhớ vị trí con trỏ rồi mở file dialog
   function pickImage() {
     rememberCursor();
     imgInputRef.current?.click();
   }
-  // Upload ảnh → chèn <img> vào vị trí con trỏ đã lưu (hoặc cuối bài nếu không có)
   async function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -190,6 +229,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
       const res = await api.post("/posts/upload-image", fd);
       if (!res.success) { alert(res.message || "Lỗi upload ảnh"); return; }
       const url = getImageUrl(res.data.url);
+      pushUndo();
       const img = document.createElement("img");
       img.src = url;
       img.setAttribute("style", "max-width:100%;height:auto;display:block;margin:8px auto;cursor:pointer;");
@@ -209,13 +249,13 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
       setUploadingImg(false);
     }
   }
-  // Dán trực tiếp vào editor: nếu có class cloze thì tự đổi thành chip
   function handlePaste(e: React.ClipboardEvent<HTMLDivElement>) {
     const host = hostRef.current;
     if (!host) return;
     const html = e.clipboardData.getData("text/html");
-    if (!html || !/class=["'][^"']*cloze/.test(html)) return; // dán thường → để trình duyệt lo
+    if (!html || !/class=["'][^"']*cloze/.test(html)) return;
     e.preventDefault();
+    pushUndo();
     const r = importLearnClickHtml(html, nextId(host));
     const frag = document.createRange().createContextualFragment(contentToChipHtml(r.content, r.gaps as any));
     const sel = window.getSelection();
@@ -229,12 +269,12 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     }
     emit();
   }
-  // Nạp từ ô dán HTML
   function loadFromPaste(mode: "replace" | "append") {
     const host = hostRef.current;
     if (!host) return;
     const raw = pasteBox.trim();
     if (!raw) return alert("Chưa dán HTML vào ô");
+    pushUndo();
     const start = mode === "replace" ? 1 : nextId(host);
     const r = importLearnClickHtml(raw, start);
     const chips = contentToChipHtml(r.content, r.gaps as any);
@@ -249,11 +289,11 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
         : "Đã nạp HTML nhưng KHÔNG thấy thẻ cloze nào (a.cloze / span.cloze) — bài sẽ chưa có chỗ trống. Bôi đen + Cmd+G để tự tạo."
     );
   }
-  // Bấm chip → mở bảng sửa; bấm ảnh → hỏi xoá
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
     const target = e.target as HTMLElement;
     if (target.tagName === "IMG") {
       if (confirm("Xoá ảnh này khỏi bài?")) {
+        pushUndo();
         savedRange.current = null;
         target.remove();
         emit();
@@ -277,6 +317,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     if (!editing) return;
     const chip = findChip(editing.id);
     if (!chip) { setEditing(null); return; }
+    pushUndo();
     const fresh = buildChipEl(editing.id, editing.type, editing.answers, editing.options, editing.hint);
     chip.replaceWith(fresh);
     setEditing(null);
@@ -285,14 +326,14 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
   function deleteGap() {
     if (!editing) return;
     const chip = findChip(editing.id);
-    if (chip) chip.replaceWith(document.createTextNode(editing.answers.split("#")[0] || ""));
+    if (chip) { pushUndo(); chip.replaceWith(document.createTextNode(editing.answers.split("#")[0] || "")); }
     setEditing(null);
     emit();
   }
-  // Đánh lại số 1..n theo thứ tự xuất hiện
   function renumber() {
     const host = hostRef.current;
     if (!host) return;
+    pushUndo();
     let i = 0;
     host.querySelectorAll<HTMLElement>("span.vgap").forEach((el) => {
       i++;
@@ -307,7 +348,6 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     });
     emit();
   }
-  // Nút định dạng nhỏ gọn
   const fmtBtn = "flex items-center justify-center rounded p-1.5 text-gray-600 hover:bg-gray-200";
   return (
     <div>
@@ -349,34 +389,37 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
         <button type="button" onClick={() => makeGap("DROPDOWN")} className="rounded bg-purple-600 px-3 py-1 text-xs font-bold text-white hover:bg-purple-700">+ Dropdown <span className="opacity-60">⌘D</span></button>
         <button type="button" onClick={() => makeGap("DRAG")} className="rounded bg-amber-600 px-3 py-1 text-xs font-bold text-white hover:bg-amber-700">+ Kéo-thả <span className="opacity-60">⌘K</span></button>
         <span className="mx-1 h-4 w-px bg-gray-300" />
+        {/* #2 Đổi dạng cả vùng chọn */}
+        <select defaultValue="" onChange={(e) => { const v = e.target.value as GapType; e.currentTarget.value = ""; if (v) changeSelectedGaps(v); }}
+          className="rounded border border-gray-400 bg-white px-2 py-1 text-xs font-medium text-gray-700" title="Bôi đen vùng nhiều chỗ trống rồi chọn để đổi cả loạt">
+          <option value="">↻ Đổi dạng vùng chọn…</option>
+          <option value="TEXT">→ Ô điền</option>
+          <option value="DROPDOWN">→ Dropdown</option>
+          <option value="DRAG">→ Kéo-thả</option>
+        </select>
+        <span className="mx-1 h-4 w-px bg-gray-300" />
         <button type="button" onClick={pickImage} disabled={uploadingImg} className="rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
           {uploadingImg ? "Đang tải ảnh..." : "🖼 Chèn ảnh"}
         </button>
         <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImagePick} />
         <span className="mx-1 h-4 w-px bg-gray-300" />
+        <button type="button" onClick={undo} disabled={!canUndo} className="inline-flex items-center gap-1 rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-40" title="Hoàn tác thao tác chỗ trống gần nhất (⌘⇧Z)"><Undo2 size={13} />Hoàn tác</button>
         <button type="button" onClick={renumber} className="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100">Đánh lại số</button>
         <span className="ml-auto text-xs text-gray-500">Đang có <b>{count}</b> chỗ trống</span>
       </div>
-      {/* Thanh ĐỊNH DẠNG CHỮ — bôi đen chữ rồi bấm */}
+      {/* Thanh ĐỊNH DẠNG CHỮ */}
       <div className="mb-2 flex flex-wrap items-center gap-1 rounded-lg border border-gray-200 bg-white p-1.5">
         <button type="button" title="Đậm" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("bold")} className={`${fmtBtn} font-bold`}><Bold size={15} /></button>
         <button type="button" title="Nghiêng" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("italic")} className={fmtBtn}><Italic size={15} /></button>
         <button type="button" title="Gạch chân" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("underline")} className={fmtBtn}><Underline size={15} /></button>
         <span className="mx-0.5 h-5 w-px bg-gray-300" />
-        {/* Cỡ chữ */}
         <select title="Cỡ chữ" defaultValue="" onMouseDown={(e) => e.stopPropagation()} onChange={(e) => { applyFontSize(e.target.value); e.currentTarget.value = ""; }}
           className="rounded border border-gray-300 px-1.5 py-1 text-xs text-gray-600">
           <option value="">Cỡ chữ</option>
-          <option value="12">12</option>
-          <option value="14">14</option>
-          <option value="16">16</option>
-          <option value="18">18</option>
-          <option value="20">20</option>
-          <option value="24">24</option>
-          <option value="28">28</option>
-          <option value="32">32</option>
+          <option value="12">12</option><option value="14">14</option><option value="16">16</option>
+          <option value="18">18</option><option value="20">20</option><option value="24">24</option>
+          <option value="28">28</option><option value="32">32</option>
         </select>
-        {/* Màu chữ */}
         <label title="Màu chữ" className={`${fmtBtn} relative cursor-pointer`}>
           <span className="text-xs font-bold" style={{ borderBottom: "3px solid #dc2626" }}>A</span>
           <input type="color" onChange={(e) => exec("foreColor", e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
@@ -392,7 +435,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
         <span className="mx-0.5 h-5 w-px bg-gray-300" />
         <button type="button" title="Xoá định dạng" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("removeFormat")} className={fmtBtn}><RemoveFormatting size={15} /></button>
       </div>
-      {/* Vùng soạn — giữ nguyên HTML */}
+      {/* Vùng soạn */}
       <style>{`
         .gap-edit-host table { width: 100% !important; max-width: 100% !important; }
         .gap-edit-host td, .gap-edit-host th { overflow-wrap: anywhere; }
@@ -412,7 +455,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
         />
       </div>
       <p className="mt-2 text-xs text-gray-400">
-        Bôi đen chữ rồi bấm nút / phím tắt (<b>⌘G</b> ô điền, <b>⌘D</b> dropdown, <b>⌘K</b> kéo-thả). Bấm vào chip để sửa đáp án / đổi dạng / thêm gợi ý (nhiều đáp án ngăn bằng #). Bấm ảnh để xoá.
+        Phím tắt: <b>⌘G</b> ô điền · <b>⌘D</b> dropdown · <b>⌘K</b> kéo-thả · <b>⌘⇧Z</b> hoàn tác. Bôi đen nhiều chỗ trống rồi dùng <b>↻ Đổi dạng vùng chọn</b> để đổi cả loạt. Bấm chip để sửa đáp án / gợi ý.
       </p>
       {/* Bảng sửa chip */}
       {editing && (
