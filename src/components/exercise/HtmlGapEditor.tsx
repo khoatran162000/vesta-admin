@@ -77,7 +77,6 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     setCount(Object.keys(data.gaps).length);
     onChange?.(data);
   }, [onChange]);
-  // Lưu ảnh chụp innerHTML TRƯỚC mỗi thao tác gap (để hoàn tác)
   const pushUndo = useCallback(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -169,7 +168,6 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     }
     const range = sel.getRangeAt(0);
     if (!host.contains(range.commonAncestorContainer)) return;
-    // các chip giao với vùng chọn
     const chips = Array.from(host.querySelectorAll<HTMLElement>("span.vgap")).filter((el) => range.intersectsNode(el));
     if (!chips.length) { alert("Vùng chọn không có chỗ trống nào"); return; }
     if (!confirm(`Đổi ${chips.length} chỗ trống sang dạng ${type === "TEXT" ? "Ô điền" : type === "DROPDOWN" ? "Dropdown" : "Kéo-thả"}?`)) return;
@@ -183,6 +181,65 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     });
     sel.removeAllRanges();
     emit();
+  }, [emit, pushUndo]);
+  // ── #1 Tạo gap HÀNG LOẠT từ [đáp án] hoặc [đáp án|opt1,opt2] trong vùng chọn (hoặc cả bài nếu không bôi) ──
+  const makeGapsFromBrackets = useCallback(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const sel = window.getSelection();
+    let container: HTMLElement = host;
+    const hasSelection = !!(sel && sel.rangeCount > 0 && !sel.isCollapsed && host.contains(sel.getRangeAt(0).commonAncestorContainer));
+    if (hasSelection) {
+      const anc = sel!.getRangeAt(0).commonAncestorContainer;
+      container = (anc.nodeType === 1 ? (anc as HTMLElement) : anc.parentElement) as HTMLElement || host;
+    }
+    const BR_TEST = /\[([^\[\]]+)\]/;
+    // Duyệt các text node — KHÔNG đụng bên trong chip (span.vgap)
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (node.parentElement?.closest("span.vgap")) return NodeFilter.FILTER_REJECT;
+        if (hasSelection && !sel!.getRangeAt(0).intersectsNode(node)) return NodeFilter.FILTER_REJECT;
+        return BR_TEST.test(node.nodeValue || "") ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    });
+    const targets: Text[] = [];
+    let node: Node | null;
+    while ((node = walker.nextNode())) targets.push(node as Text);
+    if (!targets.length) {
+      alert("Không tìm thấy [đáp án] nào.\nHãy bọc đáp án trong dấu ngoặc vuông, vd: [transport] hoặc dropdown [freezes|melts, freezes, boils]");
+      return;
+    }
+    pushUndo();
+    let created = 0;
+    let id = nextId(host);
+    for (const textNode of targets) {
+      const raw = textNode.nodeValue || "";
+      const frag = document.createDocumentFragment();
+      let last = 0;
+      const re = /\[([^\[\]]+)\]/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(raw))) {
+        if (m.index > last) frag.appendChild(document.createTextNode(raw.slice(last, m.index)));
+        const inner = m[1].trim();
+        let type: GapType = "TEXT";
+        let answers = inner;
+        let options = "";
+        if (inner.includes("|")) {
+          const [ans, opts] = inner.split("|");
+          answers = ans.trim();
+          options = (opts || "").trim();
+          type = "DROPDOWN";
+        }
+        frag.appendChild(buildChipEl(String(id++), type, answers, options));
+        created++;
+        last = m.index + m[0].length;
+      }
+      if (last < raw.length) frag.appendChild(document.createTextNode(raw.slice(last)));
+      textNode.replaceWith(frag);
+    }
+    if (sel) sel.removeAllRanges();
+    emit();
+    alert(`Đã tạo ${created} chỗ trống từ [ ].`);
   }, [emit, pushUndo]);
   // Phím tắt: ⌘G/⌘D/⌘K tạo gap; ⌘⇧Z hoàn tác gap
   useEffect(() => {
@@ -389,6 +446,9 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
         <button type="button" onClick={() => makeGap("DROPDOWN")} className="rounded bg-purple-600 px-3 py-1 text-xs font-bold text-white hover:bg-purple-700">+ Dropdown <span className="opacity-60">⌘D</span></button>
         <button type="button" onClick={() => makeGap("DRAG")} className="rounded bg-amber-600 px-3 py-1 text-xs font-bold text-white hover:bg-amber-700">+ Kéo-thả <span className="opacity-60">⌘K</span></button>
         <span className="mx-1 h-4 w-px bg-gray-300" />
+        {/* #1 Tạo gap hàng loạt từ [đáp án] */}
+        <button type="button" onClick={makeGapsFromBrackets} className="rounded bg-teal-600 px-3 py-1 text-xs font-bold text-white hover:bg-teal-700" title="Bọc đáp án trong [ ] rồi bấm để tạo hàng loạt. Có dấu | thành dropdown.">⚡ Tạo gap từ [ ]</button>
+        <span className="mx-1 h-4 w-px bg-gray-300" />
         {/* #2 Đổi dạng cả vùng chọn */}
         <select defaultValue="" onChange={(e) => { const v = e.target.value as GapType; e.currentTarget.value = ""; if (v) changeSelectedGaps(v); }}
           className="rounded border border-gray-400 bg-white px-2 py-1 text-xs font-medium text-gray-700" title="Bôi đen vùng nhiều chỗ trống rồi chọn để đổi cả loạt">
@@ -455,7 +515,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
         />
       </div>
       <p className="mt-2 text-xs text-gray-400">
-        Phím tắt: <b>⌘G</b> ô điền · <b>⌘D</b> dropdown · <b>⌘K</b> kéo-thả · <b>⌘⇧Z</b> hoàn tác. Bôi đen nhiều chỗ trống rồi dùng <b>↻ Đổi dạng vùng chọn</b> để đổi cả loạt. Bấm chip để sửa đáp án / gợi ý.
+        Phím tắt: <b>⌘G</b> ô điền · <b>⌘D</b> dropdown · <b>⌘K</b> kéo-thả · <b>⌘⇧Z</b> hoàn tác. <b>Tự gõ bài:</b> bọc đáp án trong <code>[ ]</code> rồi bấm <b>⚡ Tạo gap từ [ ]</b> (vd <code>[transport]</code> hoặc dropdown <code>[freezes|melts, freezes, boils]</code>). Bôi vùng nhiều ô rồi <b>↻ Đổi dạng vùng chọn</b> để đổi loạt. Bấm chip để sửa.
       </p>
       {/* Bảng sửa chip */}
       {editing && (
