@@ -1,5 +1,6 @@
 // FILE: src/app/(protected)/lich-cong-tac/page.tsx — Lịch công tác nội bộ (TKB tuần + nhiệm vụ đội ngũ)
 // ADMIN sửa (thêm/sửa/xoá/tick), mọi tài khoản đăng nhập đều xem. Font to, tông VESTA. Xuất PNG.
+// Desktop/tablet-ngang (≥lg): lưới ca×phòng×ngày. Mobile/tablet-dọc (<lg): view chọn 1 ngày, liệt kê dọc.
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, Trash2, Download, Loader2, X, Check, Calendar as CalIcon } from "lucide-react";
@@ -36,7 +37,6 @@ const DAY_PRESETS = [
   { label: "T2→T6", days: [0, 1, 2, 3, 4] },
   { label: "Cả tuần", days: [0, 1, 2, 3, 4, 5, 6] },
 ];
-// Màu chip theo người (8 tông)
 const PERSON_TONES: Record<string, number> = { "MS. LY": 0, "MR. TÀI": 1, "MR. D.A.": 2, "MR. TIẾN": 3, "MS. NGÂN": 4, "MR. DUY": 5, "MS. QUỲNH": 6, "MS. NGỌC": 7 };
 const TONE_BG = ["#1B2A5B", "#A6882E", "#B22234", "#2A7D6F", "#7A4E9E", "#3B6FB0", "#C0653A", "#5A6570"];
 function toneIdx(name: string): number {
@@ -56,6 +56,12 @@ const fromIso = (iso: string) => { const [y, m, d] = iso.split("-").map(Number);
 const monday = (d = new Date()) => { const x = new Date(d), n = x.getDay() || 7; x.setDate(x.getDate() - n + 1); return isoLocal(x); };
 const addDays = (iso: string, n: number) => { const d = fromIso(iso); d.setDate(d.getDate() + n); return isoLocal(d); };
 const fmt = (iso: string) => new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit" }).format(fromIso(iso));
+// hôm nay là dayIndex nào trong tuần đang xem (0-6), hoặc -1 nếu không thuộc tuần này
+function todayIndexIn(week: string): number {
+  const today = isoLocal();
+  for (let i = 0; i < 7; i++) if (addDays(week, i) === today) return i;
+  return -1;
+}
 
 function PersonChip({ name, small }: { name: string; small?: boolean }) {
   return <span style={{ background: TONE_BG[toneIdx(name)] }}
@@ -72,6 +78,8 @@ export default function LichCongTacPage() {
   const [modal, setModal] = useState<any>(null);
   const [toast, setToast] = useState("");
   const [exporting, setExporting] = useState(false);
+  // Mobile: ngày đang chọn (mặc định hôm nay nếu trong tuần, không thì T2)
+  const [mDay, setMDay] = useState(0);
   const exportRef = useRef<HTMLDivElement>(null);
 
   const load = async () => {
@@ -81,6 +89,8 @@ export default function LichCongTacPage() {
     setLoading(false);
   };
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [week]);
+  // khi đổi tuần, nhảy ngày mobile về hôm nay (nếu thuộc tuần) hoặc T2
+  useEffect(() => { const ti = todayIndexIn(week); setMDay(ti >= 0 ? ti : 0); }, [week]);
 
   const title = useMemo(() => `${fmt(week)} – ${fmt(addDays(week, 6))}`, [week]);
   const done = tasks.filter((x) => x.completed).length;
@@ -102,7 +112,7 @@ export default function LichCongTacPage() {
     if (!exportRef.current) return;
     setExporting(true);
     try {
-      await new Promise((r) => setTimeout(r, 120));   // đợi ẩn nút +/x rồi mới chụp
+      await new Promise((r) => setTimeout(r, 120));
       const html2canvas = (await import("html2canvas-pro")).default;
       const canvas = await html2canvas(exportRef.current, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
       const link = document.createElement("a");
@@ -113,6 +123,12 @@ export default function LichCongTacPage() {
     } catch (e) { notify("Lỗi xuất ảnh"); console.error(e); }
     setExporting(false);
   }
+
+  // các buổi của 1 ngày (mobile), gom theo ca
+  const dayEntries = (day: number) => SLOTS.map((slot) => ({
+    slot,
+    rooms: ROOMS.map((room) => schedule.find((v) => v.dayIndex === day && v.slot === slot.id && v.room === room)).filter(Boolean) as S[],
+  })).filter((g) => g.rooms.length > 0);
 
   return (
     <div className="mx-auto max-w-[1600px]">
@@ -131,7 +147,8 @@ export default function LichCongTacPage() {
             <button onClick={() => setWeek(monday())} className="rounded-lg px-3 py-1.5 text-sm font-semibold text-royal hover:bg-cream-dark">Tuần này</button>
             <button onClick={() => setWeek(addDays(week, 7))} className="rounded-lg p-2 text-muted hover:bg-cream-dark hover:text-royal"><ChevronRight size={18} /></button>
           </div>
-          <button onClick={exportPNG} disabled={exporting} className="btn-secondary text-base"><Download size={17} />{exporting ? "Đang xuất..." : "Xuất ảnh"}</button>
+          {/* Xuất ảnh chỉ hợp trên bản lưới (desktop) — ẩn ở mobile để tránh ảnh vỡ */}
+          <button onClick={exportPNG} disabled={exporting} className="btn-secondary hidden text-base lg:inline-flex"><Download size={17} />{exporting ? "Đang xuất..." : "Xuất ảnh"}</button>
         </div>
       </div>
 
@@ -156,53 +173,111 @@ export default function LichCongTacPage() {
           <div className="flex justify-center py-20"><Loader2 size={28} className="animate-spin text-gold" /></div>
         ) : (
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
-            {/* LỊCH */}
-            <div className="overflow-x-auto rounded-xl border border-silver/30">
-              <div className="min-w-[900px]">
-                {/* Header ngày */}
-                <div className="grid" style={{ gridTemplateColumns: "150px repeat(7, 1fr)" }}>
-                  <div className="border-b border-r border-silver/30 bg-cream px-2 py-2.5 text-xs font-bold uppercase text-muted">Ca / Phòng</div>
-                  {DAYS.map((d, i) => (
-                    <div key={d} className="border-b border-silver/30 bg-cream px-2 py-2.5 text-center">
-                      <div className="text-sm font-bold text-royal">{d}</div>
-                      <div className="text-xs text-muted">{fmt(addDays(week, i))}</div>
-                    </div>
-                  ))}
-                </div>
-                {/* Hàng: ca × phòng */}
-                {SLOTS.map((slot) => ROOMS.map((room, ri) => (
-                  <div key={slot.id + room} className="grid border-b border-silver/10" style={{ gridTemplateColumns: "150px repeat(7, 1fr)" }}>
-                    <div className="border-r border-silver/30 bg-cream/40 px-2 py-2">
-                      {ri === 0 && <div className="text-sm font-bold text-royal">{slot.name}</div>}
-                      {ri === 0 && <div className="text-[11px] text-muted">{slot.time}</div>}
-                      <div className="text-[11px] text-muted">{room}</div>
-                    </div>
-                    {DAYS.map((_, day) => {
-                      const x = schedule.find((v) => v.dayIndex === day && v.slot === slot.id && v.room === room);
-                      const people = x ? uniq([x.teacher, x.assistant, ...parseTags(x.tags)]) : [];
-                      return (
-                        <div key={day} className="border-r border-silver/10 p-1">
-                          {x ? (
-                            <div className="group relative rounded-lg border-l-4 bg-cream/40 p-1.5" style={{ borderColor: TONE_BG[toneIdx(x.teacher)] }}>
-                              <button disabled={!isAdmin} onClick={() => isAdmin && setModal({ type: "schedule", item: x })} className="block w-full text-left">
-                                <div className="text-sm font-bold text-[#1a1a2e]">{x.className}</div>
-                                <div className="mt-1 flex flex-wrap gap-1">{people.slice(0, 3).map((n) => <PersonChip key={n} name={n} small />)}{people.length > 3 && <span className="text-[11px] text-muted">+{people.length - 3}</span>}</div>
-                              </button>
-                              {isAdmin && !exporting && <button onClick={() => del("schedule", x.id)} className="absolute -right-1.5 -top-1.5 rounded-full bg-red-500 p-0.5 text-white shadow-md"><X size={12} /></button>}
-                            </div>
-                          ) : isAdmin && !exporting ? (
-                            <button onClick={() => setModal({ type: "schedule", day, slot: slot.id, room })}
-                              className="flex h-full min-h-[44px] w-full items-center justify-center rounded-lg border border-dashed border-silver/40 text-xs text-muted hover:border-gold/50 hover:bg-gold/5"><Plus size={13} /></button>
-                          ) : null}
-                        </div>
-                      );
-                    })}
+            {/* ═══════ LỊCH ═══════ */}
+            <div>
+              {/* --- LƯỚI: chỉ hiện từ lg trở lên --- */}
+              <div className="hidden overflow-x-auto rounded-xl border border-silver/30 lg:block">
+                <div className="min-w-[900px]">
+                  <div className="grid" style={{ gridTemplateColumns: "150px repeat(7, 1fr)" }}>
+                    <div className="border-b border-r border-silver/30 bg-cream px-2 py-2.5 text-xs font-bold uppercase text-muted">Ca / Phòng</div>
+                    {DAYS.map((d, i) => (
+                      <div key={d} className="border-b border-silver/30 bg-cream px-2 py-2.5 text-center">
+                        <div className="text-sm font-bold text-royal">{d}</div>
+                        <div className="text-xs text-muted">{fmt(addDays(week, i))}</div>
+                      </div>
+                    ))}
                   </div>
-                )))}
+                  {SLOTS.map((slot) => ROOMS.map((room, ri) => (
+                    <div key={slot.id + room} className="grid border-b border-silver/10" style={{ gridTemplateColumns: "150px repeat(7, 1fr)" }}>
+                      <div className="border-r border-silver/30 bg-cream/40 px-2 py-2">
+                        {ri === 0 && <div className="text-sm font-bold text-royal">{slot.name}</div>}
+                        {ri === 0 && <div className="text-[11px] text-muted">{slot.time}</div>}
+                        <div className="text-[11px] text-muted">{room}</div>
+                      </div>
+                      {DAYS.map((_, day) => {
+                        const x = schedule.find((v) => v.dayIndex === day && v.slot === slot.id && v.room === room);
+                        const people = x ? uniq([x.teacher, x.assistant, ...parseTags(x.tags)]) : [];
+                        return (
+                          <div key={day} className="border-r border-silver/10 p-1">
+                            {x ? (
+                              <div className="group relative rounded-lg border-l-4 bg-cream/40 p-1.5" style={{ borderColor: TONE_BG[toneIdx(x.teacher)] }}>
+                                <button disabled={!isAdmin} onClick={() => isAdmin && setModal({ type: "schedule", item: x })} className="block w-full text-left">
+                                  <div className="text-sm font-bold text-[#1a1a2e]">{x.className}</div>
+                                  <div className="mt-1 flex flex-wrap gap-1">{people.slice(0, 3).map((n) => <PersonChip key={n} name={n} small />)}{people.length > 3 && <span className="text-[11px] text-muted">+{people.length - 3}</span>}</div>
+                                </button>
+                                {isAdmin && !exporting && <button onClick={() => del("schedule", x.id)} className="absolute -right-1.5 -top-1.5 rounded-full bg-red-500 p-0.5 text-white shadow-md"><X size={12} /></button>}
+                              </div>
+                            ) : isAdmin && !exporting ? (
+                              <button onClick={() => setModal({ type: "schedule", day, slot: slot.id, room })}
+                                className="flex h-full min-h-[44px] w-full items-center justify-center rounded-lg border border-dashed border-silver/40 text-xs text-muted hover:border-gold/50 hover:bg-gold/5"><Plus size={13} /></button>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )))}
+                </div>
+              </div>
+
+              {/* --- VIEW DỌC: chỉ hiện dưới lg (điện thoại / tablet dọc) --- */}
+              <div className="lg:hidden">
+                {/* Chọn ngày */}
+                <div className="mb-3 grid grid-cols-7 gap-1">
+                  {DAYS.map((d, i) => {
+                    const isToday = todayIndexIn(week) === i;
+                    const count = schedule.filter((v) => v.dayIndex === i).length;
+                    return (
+                      <button key={d} onClick={() => setMDay(i)}
+                        className={`rounded-lg border py-1.5 text-center ${mDay === i ? "border-royal bg-royal text-white" : "border-silver/30 bg-white text-muted"}`}>
+                        <div className={`text-xs font-bold ${mDay === i ? "text-white" : isToday ? "text-gold-dark" : "text-royal"}`}>{d.replace("Thứ ", "T").replace("Chủ nhật", "CN")}</div>
+                        <div className={`text-[10px] ${mDay === i ? "text-white/70" : "text-muted"}`}>{fmt(addDays(week, i))}</div>
+                        {count > 0 && <div className={`mx-auto mt-0.5 h-1.5 w-1.5 rounded-full ${mDay === i ? "bg-white" : "bg-gold"}`} />}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Buổi của ngày đã chọn, gom theo ca */}
+                {isAdmin && (
+                  <button onClick={() => setModal({ type: "schedule", day: mDay, slot: "h18", room: ROOMS[0] })}
+                    className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-gold/50 bg-gold/5 py-2 text-sm font-semibold text-gold-dark">
+                    <Plus size={15} />Thêm buổi cho {DAYS[mDay]}
+                  </button>
+                )}
+                {dayEntries(mDay).length === 0 ? (
+                  <div className="rounded-xl border border-silver/30 bg-white py-10 text-center text-sm text-muted">Chưa có buổi nào trong {DAYS[mDay]}.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {dayEntries(mDay).map(({ slot, rooms }) => (
+                      <div key={slot.id} className="rounded-xl border border-silver/30 bg-white p-3">
+                        <div className="mb-2 flex items-baseline justify-between">
+                          <span className="text-sm font-bold text-royal">{slot.name}</span>
+                          <span className="text-xs text-muted">{slot.time}</span>
+                        </div>
+                        <div className="space-y-2">
+                          {rooms.map((x) => {
+                            const people = uniq([x.teacher, x.assistant, ...parseTags(x.tags)]);
+                            return (
+                              <div key={x.id} className="relative rounded-lg border-l-4 bg-cream/40 p-2.5" style={{ borderColor: TONE_BG[toneIdx(x.teacher)] }}>
+                                <button disabled={!isAdmin} onClick={() => isAdmin && setModal({ type: "schedule", item: x })} className="block w-full pr-6 text-left">
+                                  <div className="text-base font-bold text-[#1a1a2e]">{x.className}</div>
+                                  <div className="mt-0.5 text-xs text-muted">{x.room}</div>
+                                  <div className="mt-1.5 flex flex-wrap gap-1">{people.map((n) => <PersonChip key={n} name={n} small />)}</div>
+                                  {x.note && <div className="mt-1 text-xs text-muted">{x.note}</div>}
+                                </button>
+                                {isAdmin && <button onClick={() => del("schedule", x.id)} className="absolute right-1.5 top-1.5 rounded-full bg-red-500 p-1 text-white shadow-md"><Trash2 size={13} /></button>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* NHIỆM VỤ */}
+            {/* ═══════ NHIỆM VỤ ═══════ */}
             <div className="rounded-xl border border-silver/30 bg-white p-3">
               <div className="mb-3 flex items-center justify-between">
                 <div>
@@ -258,7 +333,7 @@ function Editor({ modal, week, close, saved, notify }: { modal: any; week: strin
   const [saving, setSaving] = useState(false);
   const [customTag, setCustomTag] = useState("");
   const [f, setF] = useState<any>(isS
-    ? { weekStart: week, dayIndices: [modal.day ?? old.dayIndex ?? 0], slot: modal.slot ?? old.slot ?? "morning", room: modal.room ?? old.room ?? ROOMS[0], className: old.className ?? "", teacher: old.teacher ?? GV[0], assistant: old.assistant ?? "", tags: parseTags(old.tags), note: old.note ?? "" }
+    ? { weekStart: week, dayIndices: [modal.day ?? old.dayIndex ?? 0], slot: modal.slot ?? old.slot ?? "h8", room: modal.room ?? old.room ?? ROOMS[0], className: old.className ?? "", teacher: old.teacher ?? GV[0], assistant: old.assistant ?? "", tags: parseTags(old.tags), note: old.note ?? "" }
     : { weekStart: week, title: old.title ?? "", owner: old.owner ?? STAFF_PEOPLE[0], tags: parseTags(old.tags), deadline: old.deadline ?? isoLocal(), note: old.note ?? "", completed: old.completed ?? false });
   const set = (k: string, v: any) => setF((p: any) => ({ ...p, [k]: v }));
   const toggleDay = (i: number) => set("dayIndices", f.dayIndices.includes(i) ? f.dayIndices.filter((x: number) => x !== i) : [...f.dayIndices, i].sort());
@@ -266,7 +341,7 @@ function Editor({ modal, week, close, saved, notify }: { modal: any; week: strin
   function addCustomTag() {
     const name = customTag.trim();
     if (!name) return;
-    set("tags", uniq([...f.tags, name]));   // thêm tên nhân sự mới, không trùng
+    set("tags", uniq([...f.tags, name]));
     setCustomTag("");
   }
 
