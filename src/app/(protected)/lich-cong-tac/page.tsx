@@ -175,11 +175,13 @@ export default function LichCongTacPage() {
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
             {/* ═══════ LỊCH ═══════ */}
             <div>
-              {/* --- LƯỚI: chỉ hiện từ lg trở lên --- */}
-              <div className="hidden overflow-x-auto rounded-xl border border-silver/30 lg:block">
+              {/* --- LƯỚI: chỉ hiện từ lg trở lên. Hộp cuộn 2 chiều có trần cao (tắt khi xuất ảnh để không cắt cụt). --- */}
+              <div className={`hidden rounded-xl border border-silver/30 lg:block ${exporting ? "" : "max-h-[75vh] overflow-auto"}`}>
                 <div className="min-w-[900px]">
-                  <div className="grid" style={{ gridTemplateColumns: "150px repeat(7, 1fr)" }}>
-                    <div className="border-b border-r border-silver/30 bg-cream px-2 py-2.5 text-xs font-bold uppercase text-muted">Ca / Phòng</div>
+                  {/* HÀNG HEADER — ghim đứng yên khi cuộn dọc (sticky top) */}
+                  <div className="sticky top-0 z-20 grid bg-cream" style={{ gridTemplateColumns: "150px repeat(7, 1fr)" }}>
+                    {/* Ô góc — ghim cả trên lẫn trái */}
+                    <div className="sticky left-0 z-10 border-b border-r border-silver/30 bg-cream px-2 py-2.5 text-xs font-bold uppercase text-muted">Ca / Phòng</div>
                     {DAYS.map((d, i) => (
                       <div key={d} className="border-b border-silver/30 bg-cream px-2 py-2.5 text-center">
                         <div className="text-sm font-bold text-royal">{d}</div>
@@ -189,7 +191,8 @@ export default function LichCongTacPage() {
                   </div>
                   {SLOTS.map((slot) => ROOMS.map((room, ri) => (
                     <div key={slot.id + room} className="grid border-b border-silver/10" style={{ gridTemplateColumns: "150px repeat(7, 1fr)" }}>
-                      <div className="border-r border-silver/30 bg-cream/40 px-2 py-2">
+                      {/* Cột giờ/phòng bên trái — ghim khi cuộn ngang (sticky left), nền đục để không lộ ô dưới */}
+                      <div className="sticky left-0 z-10 border-r border-silver/30 bg-cream px-2 py-2">
                         {ri === 0 && <div className="text-sm font-bold text-royal">{slot.name}</div>}
                         {ri === 0 && <div className="text-[11px] text-muted">{slot.time}</div>}
                         <div className="text-[11px] text-muted">{room}</div>
