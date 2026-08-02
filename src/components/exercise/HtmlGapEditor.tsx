@@ -6,7 +6,7 @@ import { importLearnClickHtml } from "@/lib/learnclickImport";
 import { api, getImageUrl } from "@/lib/api";
 import { Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, AlignJustify, RemoveFormatting, Undo2 } from "lucide-react";
 export type GapType = "TEXT" | "DROPDOWN" | "DRAG";
-export interface GapDef { type: GapType; answers: string[]; options?: string[]; hint?: string }
+export interface GapDef { type: GapType; answers: string[]; options?: string[]; hint?: string; group?: string }
 export interface GapData { content: string; gaps: Record<string, GapDef> }
 export interface HtmlGapEditorHandle { getData: () => GapData }
 interface Props {
@@ -25,15 +25,18 @@ const CHIP_STYLE: Record<GapType, string> = {
   DROPDOWN: "background:#f3e8ff;color:#7e22ce;border:1px solid #d8b4fe;",
   DRAG: "background:#fef3c7;color:#b45309;border:1px solid #fcd34d;",
 };
-function chipHtml(id: string, type: GapType, answers: string, options: string, hint = "") {
+function chipHtml(id: string, type: GapType, answers: string, options: string, hint = "", group = "") {
   const first = (answers.split("#")[0] || "").trim() || "___";
   const hintMark = hint.trim() ? `<span style="font-size:0.7em;">💡</span>` : "";
-  return `<span class="vgap" contenteditable="false" data-gap-id="${escAttr(id)}" data-gtype="${type}" data-answers="${escAttr(answers)}" data-options="${escAttr(options)}" data-hint="${escAttr(hint)}" style="${CHIP_STYLE[type]}display:inline-flex;align-items:center;gap:4px;border-radius:4px;padding:1px 6px;margin:0 2px;font-size:0.9em;font-weight:600;cursor:pointer;user-select:none;vertical-align:baseline;"><b style="font-size:0.7em;opacity:0.55;">${escText(id)}</b>${escText(first)}${hintMark}</span>`;
+  const g = group.trim();
+  const grpMark = g ? `<span style="font-size:0.62em;opacity:0.75;" title="Câu nhiều đáp án — không cần đúng thứ tự">⇄${escText(g)}</span>` : "";
+  const grpStyle = g ? "outline:2px dashed rgba(225,29,72,0.55);outline-offset:1px;" : "";
+  return `<span class="vgap" contenteditable="false" data-gap-id="${escAttr(id)}" data-gtype="${type}" data-answers="${escAttr(answers)}" data-options="${escAttr(options)}" data-hint="${escAttr(hint)}" data-group="${escAttr(g)}" style="${CHIP_STYLE[type]}${grpStyle}display:inline-flex;align-items:center;gap:4px;border-radius:4px;padding:1px 6px;margin:0 2px;font-size:0.9em;font-weight:600;cursor:pointer;user-select:none;vertical-align:baseline;"><b style="font-size:0.7em;opacity:0.55;">${escText(id)}</b>${escText(first)}${hintMark}${grpMark}</span>`;
 }
 function contentToChipHtml(content: string, gaps: Record<string, GapDef>) {
   return content.replace(TOKEN_RE, (_m, id) => {
     const g = gaps[String(id)] || { type: "TEXT" as GapType, answers: [] };
-    return chipHtml(String(id), (g.type || "TEXT") as GapType, (g.answers || []).join("#"), (g.options || []).join(", "), g.hint || "");
+    return chipHtml(String(id), (g.type || "TEXT") as GapType, (g.answers || []).join("#"), (g.options || []).join(", "), g.hint || "", g.group || "");
   });
 }
 function serializeHost(host: HTMLElement): GapData {
@@ -45,12 +48,13 @@ function serializeHost(host: HTMLElement): GapData {
     const answers = String(el.getAttribute("data-answers") || "").split("#").map((s) => s.trim()).filter(Boolean);
     const options = String(el.getAttribute("data-options") || "").split(",").map((s) => s.trim()).filter(Boolean);
     const hint = String(el.getAttribute("data-hint") || "").trim();
-    gaps[id] = { type, answers, ...(type === "DROPDOWN" ? { options } : {}), ...(hint ? { hint } : {}) };
+    const group = String(el.getAttribute("data-group") || "").trim();
+    gaps[id] = { type, answers, ...(type === "DROPDOWN" ? { options } : {}), ...(hint ? { hint } : {}), ...(group ? { group } : {}) };
     el.replaceWith(document.createTextNode(`[[gap:${id}]]`));
   });
   return { content: clone.innerHTML, gaps };
 }
-interface Editing { id: string; type: GapType; answers: string; options: string; hint: string }
+interface Editing { id: string; type: GapType; answers: string; options: string; hint: string; group: string }
 const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEditor({ initial, onChange }, ref) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const imgInputRef = useRef<HTMLInputElement | null>(null);
@@ -107,9 +111,17 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     });
     return max + 1;
   }
-  function buildChipEl(id: string, type: GapType, answers: string, options: string, hint = "") {
+  function nextGroupId(host: HTMLElement) {
+    let max = 0;
+    host.querySelectorAll<HTMLElement>("span.vgap[data-group]").forEach((el) => {
+      const m = /^g(\d+)$/.exec(el.getAttribute("data-group") || "");
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    });
+    return `g${max + 1}`;
+  }
+  function buildChipEl(id: string, type: GapType, answers: string, options: string, hint = "", group = "") {
     const tmp = document.createElement("div");
-    tmp.innerHTML = chipHtml(id, type, answers, options, hint);
+    tmp.innerHTML = chipHtml(id, type, answers, options, hint, group);
     return tmp.firstElementChild as HTMLElement;
   }
   function exec(command: string, value?: string) {
@@ -157,7 +169,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     sel.removeAllRanges();
     emit();
   }, [emit, pushUndo]);
-  // ── #2 Đổi dạng TẤT CẢ chip nằm trong vùng bôi đen ──
+  // ── Đổi dạng TẤT CẢ chip nằm trong vùng bôi đen (giữ nguyên nhóm) ──
   const changeSelectedGaps = useCallback((type: GapType) => {
     const host = hostRef.current;
     if (!host) return;
@@ -177,12 +189,55 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
       const answers = el.getAttribute("data-answers") || "";
       const options = el.getAttribute("data-options") || (type === "DROPDOWN" ? answers : "");
       const hint = el.getAttribute("data-hint") || "";
-      el.replaceWith(buildChipEl(id, type, answers, options, hint));
+      const group = el.getAttribute("data-group") || "";
+      el.replaceWith(buildChipEl(id, type, answers, options, hint, group));
     });
     sel.removeAllRanges();
     emit();
   }, [emit, pushUndo]);
-  // ── #1 Tạo gap HÀNG LOẠT từ [đáp án] hoặc [đáp án|opt1,opt2] trong vùng chọn (hoặc cả bài nếu không bôi) ──
+  // ── Gộp các ô đã chọn thành 1 CÂU NHIỀU ĐÁP ÁN (không thứ tự) ──
+  // Mọi ô nhận CHUNG tập đáp án (hợp các đáp án hiện có) + cùng group.
+  const groupSelectedAsMultiAnswer = useCallback(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      alert("Hãy bôi đen vùng chứa các chỗ trống muốn gộp thành 1 câu nhiều đáp án");
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    if (!host.contains(range.commonAncestorContainer)) return;
+    const chips = Array.from(host.querySelectorAll<HTMLElement>("span.vgap")).filter((el) => range.intersectsNode(el));
+    if (chips.length < 2) { alert("Cần chọn ÍT NHẤT 2 chỗ trống để gộp thành câu nhiều đáp án."); return; }
+    // Hợp tất cả đáp án của các ô (giữ thứ tự, bỏ trùng không phân biệt hoa/thường).
+    const seen = new Set<string>();
+    const union: string[] = [];
+    chips.forEach((el) => {
+      (el.getAttribute("data-answers") || "").split("#").map((s) => s.trim()).filter(Boolean).forEach((a) => {
+        const k = a.toLowerCase();
+        if (!seen.has(k)) { seen.add(k); union.push(a); }
+      });
+    });
+    if (!union.length) { alert("Các ô đang chọn chưa có đáp án nào. Hãy nhập đáp án cho từng ô trước rồi mới gộp."); return; }
+    const unionStr = union.join("#");
+    const groupId = nextGroupId(host);
+    if (!confirm(
+      `Gộp ${chips.length} chỗ trống thành 1 câu nhiều đáp án (không cần đúng thứ tự)?\n\n` +
+      `Mọi ô sẽ nhận chung tập đáp án:\n${union.join(" / ")}\n\n` +
+      `HS điền đáp án nào vào ô nào cũng được — mỗi đáp án chỉ tính 1 lần.`
+    )) return;
+    pushUndo();
+    chips.forEach((el) => {
+      const id = el.getAttribute("data-gap-id") || "";
+      const type = (el.getAttribute("data-gtype") as GapType) || "TEXT";
+      const options = el.getAttribute("data-options") || "";
+      const hint = el.getAttribute("data-hint") || "";
+      el.replaceWith(buildChipEl(id, type, unionStr, options, hint, groupId));
+    });
+    sel.removeAllRanges();
+    emit();
+  }, [emit, pushUndo]);
+  // ── Tạo gap HÀNG LOẠT từ [đáp án] hoặc [đáp án|opt1,opt2] trong vùng chọn (hoặc cả bài nếu không bôi) ──
   const makeGapsFromBrackets = useCallback(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -241,7 +296,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     emit();
     alert(`Đã tạo ${created} chỗ trống từ [ ].`);
   }, [emit, pushUndo]);
-  // Phím tắt: ⌘G/⌘D/⌘K tạo gap; ⌘⇧Z hoàn tác gap
+  // Phím tắt: ⌘G/⌘D/⌘K tạo gap; ⌘⇧Z hoàn tác; ⌘⇧M gộp câu nhiều đáp án
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -249,6 +304,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
       if (!(e.metaKey || e.ctrlKey)) return;
       const k = e.key.toLowerCase();
       if (e.shiftKey && k === "z") { e.preventDefault(); undo(); return; }
+      if (e.shiftKey && k === "m") { e.preventDefault(); groupSelectedAsMultiAnswer(); return; }
       if (e.shiftKey) return;
       if (k === "g") { e.preventDefault(); makeGap("TEXT"); }
       else if (k === "d") { e.preventDefault(); makeGap("DROPDOWN"); }
@@ -256,7 +312,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     }
     host.addEventListener("keydown", onKey);
     return () => host.removeEventListener("keydown", onKey);
-  }, [makeGap, undo]);
+  }, [makeGap, undo, groupSelectedAsMultiAnswer]);
   function rememberCursor() {
     const host = hostRef.current;
     const sel = window.getSelection();
@@ -365,6 +421,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
       answers: chip.getAttribute("data-answers") || "",
       options: chip.getAttribute("data-options") || "",
       hint: chip.getAttribute("data-hint") || "",
+      group: chip.getAttribute("data-group") || "",
     });
   }
   function findChip(id: string): HTMLElement | null {
@@ -372,11 +429,38 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
   }
   function applyEdit() {
     if (!editing) return;
+    const host = hostRef.current;
     const chip = findChip(editing.id);
-    if (!chip) { setEditing(null); return; }
+    if (!chip || !host) { setEditing(null); return; }
     pushUndo();
-    const fresh = buildChipEl(editing.id, editing.type, editing.answers, editing.options, editing.hint);
-    chip.replaceWith(fresh);
+    if (editing.group) {
+      // Đồng bộ CẢ NHÓM: mọi ô cùng group dùng chung đáp án / hint / loại.
+      host.querySelectorAll<HTMLElement>(`span.vgap[data-group="${CSS.escape(editing.group)}"]`).forEach((el) => {
+        const gid = el.getAttribute("data-gap-id") || "";
+        el.replaceWith(buildChipEl(gid, editing.type, editing.answers, editing.options, editing.hint, editing.group));
+      });
+    } else {
+      chip.replaceWith(buildChipEl(editing.id, editing.type, editing.answers, editing.options, editing.hint, ""));
+    }
+    setEditing(null);
+    emit();
+  }
+  function ungroupEditing() {
+    if (!editing || !editing.group) return;
+    const host = hostRef.current;
+    if (!host) { setEditing(null); return; }
+    pushUndo();
+    host.querySelectorAll<HTMLElement>(`span.vgap[data-group="${CSS.escape(editing.group)}"]`).forEach((el) => {
+      const gid = el.getAttribute("data-gap-id") || "";
+      el.replaceWith(buildChipEl(
+        gid,
+        (el.getAttribute("data-gtype") as GapType) || "TEXT",
+        el.getAttribute("data-answers") || "",
+        el.getAttribute("data-options") || "",
+        el.getAttribute("data-hint") || "",
+        "" // gỡ nhóm
+      ));
+    });
     setEditing(null);
     emit();
   }
@@ -399,7 +483,8 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
         (el.getAttribute("data-gtype") as GapType) || "TEXT",
         el.getAttribute("data-answers") || "",
         el.getAttribute("data-options") || "",
-        el.getAttribute("data-hint") || ""
+        el.getAttribute("data-hint") || "",
+        el.getAttribute("data-group") || ""
       );
       el.replaceWith(fresh);
     });
@@ -439,61 +524,67 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
           </>
         )}
       </div>
-      {/* Thanh công cụ tạo gap + chèn ảnh */}
-      <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2">
-        <span className="text-xs font-medium text-gray-500">Bôi đen rồi bấm (hoặc phím tắt):</span>
-        <button type="button" onClick={() => makeGap("TEXT")} className="rounded bg-blue-600 px-3 py-1 text-xs font-bold text-white hover:bg-blue-700">+ Ô điền <span className="opacity-60">⌘G</span></button>
-        <button type="button" onClick={() => makeGap("DROPDOWN")} className="rounded bg-purple-600 px-3 py-1 text-xs font-bold text-white hover:bg-purple-700">+ Dropdown <span className="opacity-60">⌘D</span></button>
-        <button type="button" onClick={() => makeGap("DRAG")} className="rounded bg-amber-600 px-3 py-1 text-xs font-bold text-white hover:bg-amber-700">+ Kéo-thả <span className="opacity-60">⌘K</span></button>
-        <span className="mx-1 h-4 w-px bg-gray-300" />
-        {/* #1 Tạo gap hàng loạt từ [đáp án] */}
-        <button type="button" onClick={makeGapsFromBrackets} className="rounded bg-teal-600 px-3 py-1 text-xs font-bold text-white hover:bg-teal-700" title="Bọc đáp án trong [ ] rồi bấm để tạo hàng loạt. Có dấu | thành dropdown.">⚡ Tạo gap từ [ ]</button>
-        <span className="mx-1 h-4 w-px bg-gray-300" />
-        {/* #2 Đổi dạng cả vùng chọn */}
-        <select defaultValue="" onChange={(e) => { const v = e.target.value as GapType; e.currentTarget.value = ""; if (v) changeSelectedGaps(v); }}
-          className="rounded border border-gray-400 bg-white px-2 py-1 text-xs font-medium text-gray-700" title="Bôi đen vùng nhiều chỗ trống rồi chọn để đổi cả loạt">
-          <option value="">↻ Đổi dạng vùng chọn…</option>
-          <option value="TEXT">→ Ô điền</option>
-          <option value="DROPDOWN">→ Dropdown</option>
-          <option value="DRAG">→ Kéo-thả</option>
-        </select>
-        <span className="mx-1 h-4 w-px bg-gray-300" />
-        <button type="button" onClick={pickImage} disabled={uploadingImg} className="rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
-          {uploadingImg ? "Đang tải ảnh..." : "🖼 Chèn ảnh"}
-        </button>
-        <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImagePick} />
-        <span className="mx-1 h-4 w-px bg-gray-300" />
-        <button type="button" onClick={undo} disabled={!canUndo} className="inline-flex items-center gap-1 rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-40" title="Hoàn tác thao tác chỗ trống gần nhất (⌘⇧Z)"><Undo2 size={13} />Hoàn tác</button>
-        <button type="button" onClick={renumber} className="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100">Đánh lại số</button>
-        <span className="ml-auto text-xs text-gray-500">Đang có <b>{count}</b> chỗ trống</span>
-      </div>
-      {/* Thanh ĐỊNH DẠNG CHỮ */}
-      <div className="mb-2 flex flex-wrap items-center gap-1 rounded-lg border border-gray-200 bg-white p-1.5">
-        <button type="button" title="Đậm" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("bold")} className={`${fmtBtn} font-bold`}><Bold size={15} /></button>
-        <button type="button" title="Nghiêng" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("italic")} className={fmtBtn}><Italic size={15} /></button>
-        <button type="button" title="Gạch chân" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("underline")} className={fmtBtn}><Underline size={15} /></button>
-        <span className="mx-0.5 h-5 w-px bg-gray-300" />
-        <select title="Cỡ chữ" defaultValue="" onMouseDown={(e) => e.stopPropagation()} onChange={(e) => { applyFontSize(e.target.value); e.currentTarget.value = ""; }}
-          className="rounded border border-gray-300 px-1.5 py-1 text-xs text-gray-600">
-          <option value="">Cỡ chữ</option>
-          <option value="12">12</option><option value="14">14</option><option value="16">16</option>
-          <option value="18">18</option><option value="20">20</option><option value="24">24</option>
-          <option value="28">28</option><option value="32">32</option>
-        </select>
-        <label title="Màu chữ" className={`${fmtBtn} relative cursor-pointer`}>
-          <span className="text-xs font-bold" style={{ borderBottom: "3px solid #dc2626" }}>A</span>
-          <input type="color" onChange={(e) => exec("foreColor", e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
-        </label>
-        <span className="mx-0.5 h-5 w-px bg-gray-300" />
-        <button type="button" title="Canh trái" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyLeft")} className={fmtBtn}><AlignLeft size={15} /></button>
-        <button type="button" title="Canh giữa" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyCenter")} className={fmtBtn}><AlignCenter size={15} /></button>
-        <button type="button" title="Canh phải" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyRight")} className={fmtBtn}><AlignRight size={15} /></button>
-        <button type="button" title="Canh đều" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyFull")} className={fmtBtn}><AlignJustify size={15} /></button>
-        <span className="mx-0.5 h-5 w-px bg-gray-300" />
-        <button type="button" title="Danh sách chấm" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("insertUnorderedList")} className={fmtBtn}><List size={15} /></button>
-        <button type="button" title="Danh sách số" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("insertOrderedList")} className={fmtBtn}><ListOrdered size={15} /></button>
-        <span className="mx-0.5 h-5 w-px bg-gray-300" />
-        <button type="button" title="Xoá định dạng" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("removeFormat")} className={fmtBtn}><RemoveFormatting size={15} /></button>
+      {/* Thanh công cụ + định dạng — GHIM lại khi cuộn để luôn bấm được */}
+      <div className="sticky top-0 z-20 bg-white pt-0.5">
+        {/* Thanh công cụ tạo gap + chèn ảnh */}
+        <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2">
+          <span className="text-xs font-medium text-gray-500">Bôi đen rồi bấm (hoặc phím tắt):</span>
+          <button type="button" onClick={() => makeGap("TEXT")} className="rounded bg-blue-600 px-3 py-1 text-xs font-bold text-white hover:bg-blue-700">+ Ô điền <span className="opacity-60">⌘G</span></button>
+          <button type="button" onClick={() => makeGap("DROPDOWN")} className="rounded bg-purple-600 px-3 py-1 text-xs font-bold text-white hover:bg-purple-700">+ Dropdown <span className="opacity-60">⌘D</span></button>
+          <button type="button" onClick={() => makeGap("DRAG")} className="rounded bg-amber-600 px-3 py-1 text-xs font-bold text-white hover:bg-amber-700">+ Kéo-thả <span className="opacity-60">⌘K</span></button>
+          <span className="mx-1 h-4 w-px bg-gray-300" />
+          {/* Tạo gap hàng loạt từ [đáp án] */}
+          <button type="button" onClick={makeGapsFromBrackets} className="rounded bg-teal-600 px-3 py-1 text-xs font-bold text-white hover:bg-teal-700" title="Bọc đáp án trong [ ] rồi bấm để tạo hàng loạt. Có dấu | thành dropdown.">⚡ Tạo gap từ [ ]</button>
+          <span className="mx-1 h-4 w-px bg-gray-300" />
+          {/* Gộp câu nhiều đáp án (không thứ tự) */}
+          <button type="button" onClick={groupSelectedAsMultiAnswer} className="rounded bg-rose-600 px-3 py-1 text-xs font-bold text-white hover:bg-rose-700" title="Bôi đen nhiều ô rồi bấm: mọi ô nhận CHUNG tập đáp án. HS điền không cần đúng thứ tự; mỗi đáp án chỉ tính 1 lần. (⌘⇧M)">⇄ Gộp câu nhiều đáp án <span className="opacity-60">⌘⇧M</span></button>
+          <span className="mx-1 h-4 w-px bg-gray-300" />
+          {/* Đổi dạng cả vùng chọn */}
+          <select defaultValue="" onChange={(e) => { const v = e.target.value as GapType; e.currentTarget.value = ""; if (v) changeSelectedGaps(v); }}
+            className="rounded border border-gray-400 bg-white px-2 py-1 text-xs font-medium text-gray-700" title="Bôi đen vùng nhiều chỗ trống rồi chọn để đổi cả loạt">
+            <option value="">↻ Đổi dạng vùng chọn…</option>
+            <option value="TEXT">→ Ô điền</option>
+            <option value="DROPDOWN">→ Dropdown</option>
+            <option value="DRAG">→ Kéo-thả</option>
+          </select>
+          <span className="mx-1 h-4 w-px bg-gray-300" />
+          <button type="button" onClick={pickImage} disabled={uploadingImg} className="rounded bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
+            {uploadingImg ? "Đang tải ảnh..." : "🖼 Chèn ảnh"}
+          </button>
+          <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImagePick} />
+          <span className="mx-1 h-4 w-px bg-gray-300" />
+          <button type="button" onClick={undo} disabled={!canUndo} className="inline-flex items-center gap-1 rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-40" title="Hoàn tác thao tác chỗ trống gần nhất (⌘⇧Z)"><Undo2 size={13} />Hoàn tác</button>
+          <button type="button" onClick={renumber} className="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100">Đánh lại số</button>
+          <span className="ml-auto text-xs text-gray-500">Đang có <b>{count}</b> chỗ trống</span>
+        </div>
+        {/* Thanh ĐỊNH DẠNG CHỮ */}
+        <div className="mb-2 flex flex-wrap items-center gap-1 rounded-lg border border-gray-200 bg-white p-1.5">
+          <button type="button" title="Đậm" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("bold")} className={`${fmtBtn} font-bold`}><Bold size={15} /></button>
+          <button type="button" title="Nghiêng" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("italic")} className={fmtBtn}><Italic size={15} /></button>
+          <button type="button" title="Gạch chân" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("underline")} className={fmtBtn}><Underline size={15} /></button>
+          <span className="mx-0.5 h-5 w-px bg-gray-300" />
+          <select title="Cỡ chữ" defaultValue="" onMouseDown={(e) => e.stopPropagation()} onChange={(e) => { applyFontSize(e.target.value); e.currentTarget.value = ""; }}
+            className="rounded border border-gray-300 px-1.5 py-1 text-xs text-gray-600">
+            <option value="">Cỡ chữ</option>
+            <option value="12">12</option><option value="14">14</option><option value="16">16</option>
+            <option value="18">18</option><option value="20">20</option><option value="24">24</option>
+            <option value="28">28</option><option value="32">32</option>
+          </select>
+          <label title="Màu chữ" className={`${fmtBtn} relative cursor-pointer`}>
+            <span className="text-xs font-bold" style={{ borderBottom: "3px solid #dc2626" }}>A</span>
+            <input type="color" onChange={(e) => exec("foreColor", e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+          </label>
+          <span className="mx-0.5 h-5 w-px bg-gray-300" />
+          <button type="button" title="Canh trái" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyLeft")} className={fmtBtn}><AlignLeft size={15} /></button>
+          <button type="button" title="Canh giữa" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyCenter")} className={fmtBtn}><AlignCenter size={15} /></button>
+          <button type="button" title="Canh phải" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyRight")} className={fmtBtn}><AlignRight size={15} /></button>
+          <button type="button" title="Canh đều" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("justifyFull")} className={fmtBtn}><AlignJustify size={15} /></button>
+          <span className="mx-0.5 h-5 w-px bg-gray-300" />
+          <button type="button" title="Danh sách chấm" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("insertUnorderedList")} className={fmtBtn}><List size={15} /></button>
+          <button type="button" title="Danh sách số" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("insertOrderedList")} className={fmtBtn}><ListOrdered size={15} /></button>
+          <span className="mx-0.5 h-5 w-px bg-gray-300" />
+          <button type="button" title="Xoá định dạng" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("removeFormat")} className={fmtBtn}><RemoveFormatting size={15} /></button>
+        </div>
       </div>
       {/* Vùng soạn */}
       <style>{`
@@ -501,7 +592,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
         .gap-edit-host td, .gap-edit-host th { overflow-wrap: anywhere; }
         .gap-edit-host img, .gap-edit-host iframe, .gap-edit-host video { max-width: 100%; }
       `}</style>
-      <div className="overflow-x-auto rounded-lg border border-gray-300 focus-within:border-amber-400">
+      <div className="max-h-[60vh] overflow-auto rounded-lg border border-gray-300 focus-within:border-amber-400">
         <div
           ref={hostRef}
           contentEditable
@@ -515,12 +606,17 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
         />
       </div>
       <p className="mt-2 text-xs text-gray-400">
-        Phím tắt: <b>⌘G</b> ô điền · <b>⌘D</b> dropdown · <b>⌘K</b> kéo-thả · <b>⌘⇧Z</b> hoàn tác. <b>Tự gõ bài:</b> bọc đáp án trong <code>[ ]</code> rồi bấm <b>⚡ Tạo gap từ [ ]</b> (vd <code>[transport]</code> hoặc dropdown <code>[freezes|melts, freezes, boils]</code>). Bôi vùng nhiều ô rồi <b>↻ Đổi dạng vùng chọn</b> để đổi loạt. Bấm chip để sửa.
+        Phím tắt: <b>⌘G</b> ô điền · <b>⌘D</b> dropdown · <b>⌘K</b> kéo-thả · <b>⌘⇧Z</b> hoàn tác · <b>⌘⇧M</b> gộp câu nhiều đáp án. <b>Câu nhiều đáp án (không thứ tự):</b> bôi các ô rồi bấm <b>⇄ Gộp câu nhiều đáp án</b> — mọi ô nhận chung tập đáp án, HS điền ô nào cũng được, mỗi đáp án chỉ tính 1 lần. Bấm chip để sửa (sửa 1 ô trong nhóm sẽ đồng bộ cả nhóm).
       </p>
       {/* Bảng sửa chip */}
       {editing && (
         <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-          <div className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">Chỗ trống #{editing.id}</div>
+          <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-gray-500">
+            <span>Chỗ trống #{editing.id}</span>
+            {editing.group && (
+              <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[0.65rem] font-bold text-rose-600" title="Ô này thuộc câu nhiều đáp án — mọi thay đổi áp cho cả nhóm">⇄ Nhóm {editing.group}</span>
+            )}
+          </div>
           <label className="mb-1 block text-xs font-medium text-gray-600">Loại</label>
           <select value={editing.type} onChange={(e) => setEditing({ ...editing, type: e.target.value as GapType })}
             className="mb-2 w-full rounded border border-gray-300 px-2 py-1 text-sm">
@@ -528,9 +624,11 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
             <option value="DROPDOWN">Dropdown (chọn)</option>
             <option value="DRAG">Kéo-thả</option>
           </select>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Đáp án đúng (nhiều đáp án ngăn bằng #)</label>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            {editing.group ? "Tập đáp án dùng chung (mỗi đáp án ngăn bằng #)" : "Đáp án đúng (nhiều đáp án ngăn bằng #)"}
+          </label>
           <input type="text" value={editing.answers} onChange={(e) => setEditing({ ...editing, answers: e.target.value })}
-            placeholder="vd: color#colour" className="mb-2 w-full rounded border border-gray-300 px-2 py-1 text-sm" />
+            placeholder={editing.group ? "vd: A#B#D#G#H" : "vd: color#colour"} className="mb-2 w-full rounded border border-gray-300 px-2 py-1 text-sm" />
           {editing.type === "DROPDOWN" && (
             <>
               <label className="mb-1 block text-xs font-medium text-gray-600">Lựa chọn dropdown (ngăn bằng dấu ,)</label>
@@ -540,9 +638,14 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
           )}
           <label className="mb-1 block text-xs font-medium text-gray-600">Gợi ý (tuỳ chọn — để trống nếu không cần)</label>
           <input type="text" value={editing.hint} onChange={(e) => setEditing({ ...editing, hint: e.target.value })}
-            placeholder="vd: động từ, 1 từ, bắt đầu bằng r..." className="mb-2 w-full rounded border border-gray-300 px-2 py-1 text-sm" />
+            placeholder={editing.group ? "để trống — nhóm nhiều đáp án không tự gợi ý (tránh lộ đáp án)" : "vd: động từ, 1 từ, bắt đầu bằng r..."} className="mb-2 w-full rounded border border-gray-300 px-2 py-1 text-sm" />
           <div className="flex items-center justify-between">
-            <button type="button" onClick={deleteGap} className="text-xs font-medium text-red-600 hover:underline">Xoá chỗ trống</button>
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={deleteGap} className="text-xs font-medium text-red-600 hover:underline">Xoá chỗ trống</button>
+              {editing.group && (
+                <button type="button" onClick={ungroupEditing} className="text-xs font-medium text-rose-600 hover:underline" title="Tách tất cả ô khỏi nhóm, quay lại chấm từng ô độc lập">Bỏ nhóm</button>
+              )}
+            </div>
             <div className="flex gap-2">
               <button type="button" onClick={() => setEditing(null)} className="rounded border border-gray-300 px-3 py-1 text-xs">Huỷ</button>
               <button type="button" onClick={applyEdit} className="rounded bg-gray-800 px-3 py-1 text-xs font-medium text-white">Xong</button>
