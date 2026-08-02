@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, BookOpen, GraduationCap, Bell, UserCircle,
-  LogOut, ChevronDown, Calendar, FileText, Target, BarChart3, ShieldAlert, MessageSquare
+  LogOut, ChevronDown, Calendar, FileText, Target, BarChart3, ShieldAlert, MessageSquare, Menu, X
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth, ROLE_LABELS } from "@/hooks/useAuth";
@@ -65,11 +65,13 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const [openMenus, setOpenMenus] = useState<string[]>([]);
   const [consultCount, setConsultCount] = useState(0);
   const [orderCount, setOrderCount] = useState(0);
+  const [drawerOpen, setDrawerOpen] = useState(false);  // sidebar mobile
   useEffect(() => {
     if (!loading && !user) router.replace("/dang-nhap");
   }, [loading, user, router]);
+  // Đóng drawer mỗi khi chuyển trang (mobile)
+  useEffect(() => { setDrawerOpen(false); }, [pathname]);
   // Đếm yêu cầu tư vấn MỚI (chỉ ADMIN) — poll mỗi 60s để badge tự cập nhật.
-  // Cập nhật lại ngay khi chuyển route (vd vừa xử lý xong ở trang /tu-van rồi rời đi).
   useEffect(() => {
     if (loading || user?.role !== "ADMIN") return;
     let alive = true;
@@ -121,83 +123,115 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     .filter((item) => "href" in item || (item as NavGroup).children.length > 0);
   // Số badge theo key
   const badgeFor = (key?: string) => (key === "consultation" ? consultCount : key === "orders" ? orderCount : 0);
-  return (
-    <div className="flex min-h-screen bg-cream">
-      <aside className="sticky top-0 flex h-screen w-[240px] shrink-0 flex-col border-r border-silver/30 bg-white">
-        <div className="border-b border-silver/20 px-5 py-5">
+
+  // Nội dung sidebar (dùng chung cho bản desktop cố định + drawer mobile)
+  const sidebarInner = (
+    <>
+      <div className="flex items-start justify-between border-b border-silver/20 px-5 py-5">
+        <div>
           <p className="font-display text-xl font-bold text-royal">VESTA ADMIN</p>
           <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted">Quản trị hệ thống</p>
         </div>
-        <div className="border-b border-silver/20 px-5 py-3">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-royal/10 text-sm font-bold text-royal">{user.fullName.charAt(0)}</div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-[#1a1a2e]">{user.fullName}</p>
-              <p className="truncate text-[0.6rem] text-muted">{ROLE_LABELS[user.role]}</p>
-            </div>
+        {/* Nút đóng chỉ hiện ở drawer mobile */}
+        <button onClick={() => setDrawerOpen(false)} className="rounded-lg p-1 text-muted hover:text-royal lg:hidden"><X size={20} /></button>
+      </div>
+      <div className="border-b border-silver/20 px-5 py-3">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-royal/10 text-sm font-bold text-royal">{user.fullName.charAt(0)}</div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-[#1a1a2e]">{user.fullName}</p>
+            <p className="truncate text-[0.6rem] text-muted">{ROLE_LABELS[user.role]}</p>
           </div>
         </div>
-        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
-          {navForRole.map((item) => {
-            if ("href" in item) {
-              const link = item as NavLink;
-              const active = pathname === link.href || pathname.startsWith(link.href + "/");
-              const badge = badgeFor(link.badgeKey);
-              return (
-                <Link key={link.href} href={link.href}
-                  className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-[0.82rem] font-medium transition-colors ${active ? "bg-royal/8 text-royal" : "text-muted hover:bg-cream hover:text-royal"}`}>
-                  <link.icon size={17} />
-                  <span className="flex-1">{link.label}</span>
-                  {badge > 0 && (
-                    <span className="ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[0.65rem] font-bold text-white">
-                      {badge > 99 ? "99+" : badge}
-                    </span>
-                  )}
-                </Link>
-              );
-            }
-            const group = item as NavGroup;
-            const isOpen = openMenus.includes(group.label);
-            const hasActive = group.children.some((c) => pathname === c.href || pathname.startsWith(c.href + "/"));
+      </div>
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
+        {navForRole.map((item) => {
+          if ("href" in item) {
+            const link = item as NavLink;
+            const active = pathname === link.href || pathname.startsWith(link.href + "/");
+            const badge = badgeFor(link.badgeKey);
             return (
-              <div key={group.label}>
-                <button onClick={() => toggleMenu(group.label)}
-                  className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[0.82rem] font-medium transition-colors ${hasActive ? "text-royal" : "text-muted hover:bg-cream hover:text-royal"}`}>
-                  <group.icon size={17} />
-                  <span className="flex-1 text-left">{group.label}</span>
-                  <ChevronDown size={14} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
-                </button>
-                {(isOpen || hasActive) && (
-                  <div className="ml-7 mt-0.5 space-y-0.5 border-l border-silver/20 pl-3">
-                    {group.children.map((child) => {
-                      const active = pathname === child.href || pathname.startsWith(child.href + "/");
-                      const cbadge = badgeFor(child.badgeKey);
-                      return (
-                        <Link key={child.href} href={child.href}
-                          className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[0.78rem] transition-colors ${active ? "font-semibold text-royal" : "text-muted hover:text-royal"}`}>
-                          <span className="flex-1">{child.label}</span>
-                          {cbadge > 0 && (
-                            <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[0.6rem] font-bold text-white">
-                              {cbadge > 99 ? "99+" : cbadge}
-                            </span>
-                          )}
-                        </Link>
-                      );
-                    })}
-                  </div>
+              <Link key={link.href} href={link.href}
+                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-[0.82rem] font-medium transition-colors ${active ? "bg-royal/8 text-royal" : "text-muted hover:bg-cream hover:text-royal"}`}>
+                <link.icon size={17} />
+                <span className="flex-1">{link.label}</span>
+                {badge > 0 && (
+                  <span className="ml-auto inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[0.65rem] font-bold text-white">
+                    {badge > 99 ? "99+" : badge}
+                  </span>
                 )}
-              </div>
+              </Link>
             );
-          })}
-        </nav>
-        <div className="border-t border-silver/20 px-3 py-3">
-          <button onClick={logout}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[0.82rem] font-medium text-muted transition-colors hover:bg-red-50 hover:text-red-600">
-            <LogOut size={17} />Đăng xuất
-          </button>
-        </div>
+          }
+          const group = item as NavGroup;
+          const isOpen = openMenus.includes(group.label);
+          const hasActive = group.children.some((c) => pathname === c.href || pathname.startsWith(c.href + "/"));
+          return (
+            <div key={group.label}>
+              <button onClick={() => toggleMenu(group.label)}
+                className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[0.82rem] font-medium transition-colors ${hasActive ? "text-royal" : "text-muted hover:bg-cream hover:text-royal"}`}>
+                <group.icon size={17} />
+                <span className="flex-1 text-left">{group.label}</span>
+                <ChevronDown size={14} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
+              </button>
+              {(isOpen || hasActive) && (
+                <div className="ml-7 mt-0.5 space-y-0.5 border-l border-silver/20 pl-3">
+                  {group.children.map((child) => {
+                    const active = pathname === child.href || pathname.startsWith(child.href + "/");
+                    const cbadge = badgeFor(child.badgeKey);
+                    return (
+                      <Link key={child.href} href={child.href}
+                        className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[0.78rem] transition-colors ${active ? "font-semibold text-royal" : "text-muted hover:text-royal"}`}>
+                        <span className="flex-1">{child.label}</span>
+                        {cbadge > 0 && (
+                          <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[0.6rem] font-bold text-white">
+                            {cbadge > 99 ? "99+" : cbadge}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </nav>
+      <div className="border-t border-silver/20 px-3 py-3">
+        <button onClick={logout}
+          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[0.82rem] font-medium text-muted transition-colors hover:bg-red-50 hover:text-red-600">
+          <LogOut size={17} />Đăng xuất
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex min-h-screen bg-cream">
+      {/* Sidebar cố định — chỉ desktop (lg trở lên) */}
+      <aside className="sticky top-0 hidden h-screen w-[240px] shrink-0 flex-col border-r border-silver/30 bg-white lg:flex">
+        {sidebarInner}
       </aside>
-      <main className="flex-1 p-6">{children}</main>
+
+      {/* Drawer mobile — overlay + panel trượt, chỉ dưới lg */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setDrawerOpen(false)} />
+          <aside className="absolute left-0 top-0 flex h-full w-[260px] max-w-[80%] flex-col bg-white shadow-2xl">
+            {sidebarInner}
+          </aside>
+        </div>
+      )}
+
+      {/* Vùng nội dung */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Thanh trên cùng — chỉ mobile: nút mở menu */}
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-silver/20 bg-white px-4 py-3 lg:hidden">
+          <button onClick={() => setDrawerOpen(true)} className="rounded-lg p-1.5 text-royal hover:bg-cream"><Menu size={22} /></button>
+          <span className="font-display text-lg font-bold text-royal">VESTA ADMIN</span>
+        </header>
+        <main className="min-w-0 flex-1 p-4 sm:p-6">{children}</main>
+      </div>
     </div>
   );
 }

@@ -260,7 +260,7 @@ export default function LichCongTacPage() {
                             return (
                               <div key={x.id} className="relative rounded-lg border-l-4 bg-cream/40 p-2.5" style={{ borderColor: TONE_BG[toneIdx(x.teacher)] }}>
                                 <button disabled={!isAdmin} onClick={() => isAdmin && setModal({ type: "schedule", item: x })} className="block w-full pr-6 text-left">
-                                  <div className="text-base font-bold text-[#1a1a2e]">{x.className}</div>
+                                  <div className="break-words text-base font-bold text-[#1a1a2e]">{x.className}</div>
                                   <div className="mt-0.5 text-xs text-muted">{x.room}</div>
                                   <div className="mt-1.5 flex flex-wrap gap-1">{people.map((n) => <PersonChip key={n} name={n} small />)}</div>
                                   {x.note && <div className="mt-1 text-xs text-muted">{x.note}</div>}
