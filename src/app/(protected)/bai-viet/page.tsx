@@ -2,7 +2,8 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Pencil, Trash2, ExternalLink, Search, Filter, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Pencil, Trash2, ExternalLink, Search, Filter, Loader2, Copy } from "lucide-react";
 import { api, getImageUrl } from "@/lib/api";
 
 interface Post {
@@ -20,6 +21,7 @@ interface Post {
 const LANDING_URL = process.env.NEXT_PUBLIC_LANDING_URL || "http://localhost:3000";
 
 export default function PostListPage() {
+  const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -29,6 +31,7 @@ export default function PostListPage() {
   const [page, setPage] = useState(1);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [dupId, setDupId] = useState<string | null>(null);
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
@@ -72,6 +75,14 @@ export default function PostListPage() {
     } finally {
       setDeleting(false);
     }
+  }
+
+  async function handleDuplicate(id: string) {
+    setDupId(id);
+    const data = await api.post(`/posts/${id}/duplicate`, {});
+    setDupId(null);
+    if (data.success && data.data?.id) router.push(`/bai-viet/${data.data.id}`);
+    else alert(data.message || "Lỗi nhân bản");
   }
 
   function formatDate(s: string) {
@@ -165,6 +176,10 @@ export default function PostListPage() {
                           <ExternalLink size={15} />
                         </a>
                       )}
+                      <button onClick={() => handleDuplicate(post.id)} disabled={dupId === post.id}
+                        className="rounded-lg p-2 text-muted hover:bg-cream-dark hover:text-royal disabled:opacity-40" title="Nhân bản (tạo bản nháp cùng format)">
+                        {dupId === post.id ? <Loader2 size={15} className="animate-spin" /> : <Copy size={15} />}
+                      </button>
                       <Link href={`/bai-viet/${post.id}`}
                         className="rounded-lg p-2 text-muted hover:bg-cream-dark hover:text-royal" title="Chỉnh sửa">
                         <Pencil size={15} />

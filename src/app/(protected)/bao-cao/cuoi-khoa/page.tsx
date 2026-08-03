@@ -2,14 +2,17 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Loader2, Pencil, Trash2, Layers } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Loader2, Pencil, Trash2, Layers, Copy } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLevels } from "@/lib/useLevels";
 export default function FinalReportListPage() {
+  const router = useRouter();
   const COURSES = useLevels();
   const [reports, setReports] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dupId, setDupId] = useState<string | null>(null);
   const [filterCourse, setFilterCourse] = useState("");
   const [filterClassId, setFilterClassId] = useState("");
   useEffect(() => {
@@ -33,6 +36,13 @@ export default function FinalReportListPage() {
     const data = await api.delete(`/final-reports/${id}`);
     if (data.success) load();
     else alert(data.message || "Lỗi xoá");
+  }
+  async function handleDuplicate(id: string) {
+    setDupId(id);
+    const data = await api.post(`/final-reports/${id}/duplicate`, {});
+    setDupId(null);
+    if (data.success && data.data?.id) router.push(`/bao-cao/cuoi-khoa/${data.data.id}`);
+    else alert(data.message || "Lỗi nhân bản");
   }
   function fmtDate(d: string | null) {
     if (!d) return "—";
@@ -115,6 +125,10 @@ export default function FinalReportListPage() {
                   <td className="px-4 py-3 text-muted">{r.creator?.fullName || "—"}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => handleDuplicate(r.id)} disabled={dupId === r.id} title="Nhân bản (tạo bản nháp cùng format)"
+                        className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal disabled:opacity-40">
+                        {dupId === r.id ? <Loader2 size={15} className="animate-spin" /> : <Copy size={15} />}
+                      </button>
                       <Link href={`/bao-cao/cuoi-khoa/${r.id}`} title="Sửa"
                         className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Pencil size={15} /></Link>
                       <button onClick={() => handleDelete(r.id)} title="Xoá"

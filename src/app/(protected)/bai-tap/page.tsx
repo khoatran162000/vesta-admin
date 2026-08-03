@@ -2,7 +2,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Plus, Trash2, Loader2, Eye, EyeOff, PenTool, BarChart3 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Trash2, Loader2, Eye, EyeOff, PenTool, BarChart3, Copy } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { canEditContent } from "@/lib/permissions";
@@ -13,10 +14,12 @@ const VIS_LABELS: Record<string, { label: string; color: string }> = {
   CLASS: { label: "Theo lớp", color: "bg-amber-50 text-amber-700" },
 };
 export default function ExerciseListPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const canEdit = canEditContent(user?.role);
   const [exercises, setExercises] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dupId, setDupId] = useState<string | null>(null);
   useEffect(() => { loadData(); }, []);
   async function loadData() {
     setLoading(true);
@@ -34,6 +37,13 @@ export default function ExerciseListPage() {
     const res = await api.delete(`/interactive/${id}`);
     if (!res.success) { alert(res.message || "Không có quyền thực hiện"); return; }
     loadData();
+  }
+  async function handleDuplicate(id: string) {
+    setDupId(id);
+    const res = await api.post(`/interactive/${id}/duplicate`, {});
+    setDupId(null);
+    if (res.success && res.data?.id) router.push(`/bai-tap/${res.data.id}/sua`);
+    else alert(res.message || "Không có quyền thực hiện / lỗi nhân bản");
   }
   return (
     <div className="mx-auto max-w-[1100px]">
@@ -99,6 +109,10 @@ export default function ExerciseListPage() {
                       <Link href={`/bai-tap/${ex.id}/thong-ke`} title="Thống kê" className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><BarChart3 size={14} /></Link>
                       {canEdit ? (
                         <>
+                          <button onClick={() => handleDuplicate(ex.id)} disabled={dupId === ex.id} title="Nhân bản (tạo bản nháp cùng format)"
+                            className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal disabled:opacity-40">
+                            {dupId === ex.id ? <Loader2 size={14} className="animate-spin" /> : <Copy size={14} />}
+                          </button>
                           <Link href={`/bai-tap/${ex.id}/sua`} title="Sửa" className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><PenTool size={14} /></Link>
                           <button onClick={() => handleDelete(ex.id)} title="Xoá" className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
                         </>
