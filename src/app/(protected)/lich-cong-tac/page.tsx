@@ -224,20 +224,24 @@ export default function LichCongTacPage() {
 
               {/* --- VIEW DỌC: chỉ hiện dưới lg (điện thoại / tablet dọc) --- */}
               <div className="lg:hidden">
-                {/* Chọn ngày */}
-                <div className="mb-3 grid grid-cols-7 gap-1">
-                  {DAYS.map((d, i) => {
-                    const isToday = todayIndexIn(week) === i;
-                    const count = schedule.filter((v) => v.dayIndex === i).length;
-                    return (
-                      <button key={d} onClick={() => setMDay(i)}
-                        className={`rounded-lg border py-1.5 text-center ${mDay === i ? "border-royal bg-royal text-white" : "border-silver/30 bg-white text-muted"}`}>
-                        <div className={`text-xs font-bold ${mDay === i ? "text-white" : isToday ? "text-gold-dark" : "text-royal"}`}>{d.replace("Thứ ", "T").replace("Chủ nhật", "CN")}</div>
-                        <div className={`text-[10px] ${mDay === i ? "text-white/70" : "text-muted"}`}>{fmt(addDays(week, i))}</div>
-                        {count > 0 && <div className={`mx-auto mt-0.5 h-1.5 w-1.5 rounded-full ${mDay === i ? "bg-white" : "bg-gold"}`} />}
-                      </button>
-                    );
-                  })}
+                {/* Chọn ngày — GHIM dưới header mobile (sticky), cuộn xuống vẫn thấy & đổi được ngày.
+                    top-[49px] = chiều cao header "VESTA ADMIN" (py-3 + text-lg + border). z thấp hơn header (z-30).
+                    -mx-4 sm:-mx-6 + px-* : kéo nền ngày phủ hết bề ngang khung trắng khi ghim, không hở mép. */}
+                <div className="sticky top-[49px] z-20 -mx-4 mb-3 bg-white px-4 pb-2 pt-1 sm:-mx-6 sm:px-6">
+                  <div className="grid grid-cols-7 gap-1">
+                    {DAYS.map((d, i) => {
+                      const isToday = todayIndexIn(week) === i;
+                      const count = schedule.filter((v) => v.dayIndex === i).length;
+                      return (
+                        <button key={d} onClick={() => setMDay(i)}
+                          className={`rounded-lg border py-1.5 text-center ${mDay === i ? "border-royal bg-royal text-white" : "border-silver/30 bg-white text-muted"}`}>
+                          <div className={`text-xs font-bold ${mDay === i ? "text-white" : isToday ? "text-gold-dark" : "text-royal"}`}>{d.replace("Thứ ", "T").replace("Chủ nhật", "CN")}</div>
+                          <div className={`text-[10px] ${mDay === i ? "text-white/70" : "text-muted"}`}>{fmt(addDays(week, i))}</div>
+                          {count > 0 && <div className={`mx-auto mt-0.5 h-1.5 w-1.5 rounded-full ${mDay === i ? "bg-white" : "bg-gold"}`} />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Buổi của ngày đã chọn, gom theo ca */}
