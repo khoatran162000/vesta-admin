@@ -128,10 +128,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const sidebarInner = (
     <>
       <div className="flex items-start justify-between border-b border-silver/20 px-5 py-5">
-        <div>
+        {/* Bấm logo → về Dashboard */}
+        <Link href="/dashboard" className="group -m-1 rounded-lg p-1 transition-colors hover:bg-cream" title="Về Dashboard">
           <p className="font-display text-xl font-bold text-royal">VESTA ADMIN</p>
-          <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted">Quản trị hệ thống</p>
-        </div>
+          <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-muted group-hover:text-royal">Quản trị hệ thống</p>
+        </Link>
         {/* Nút đóng chỉ hiện ở drawer mobile */}
         <button onClick={() => setDrawerOpen(false)} className="rounded-lg p-1 text-muted hover:text-royal lg:hidden"><X size={20} /></button>
       </div>
@@ -225,10 +226,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
       {/* Vùng nội dung */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Thanh trên cùng — chỉ mobile: nút mở menu */}
+        {/* Thanh trên cùng — chỉ mobile: nút mở menu + logo về Dashboard */}
         <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-silver/20 bg-white px-4 py-3 lg:hidden">
           <button onClick={() => setDrawerOpen(true)} className="rounded-lg p-1.5 text-royal hover:bg-cream"><Menu size={22} /></button>
-          <span className="font-display text-lg font-bold text-royal">VESTA ADMIN</span>
+          <Link href="/dashboard" className="font-display text-lg font-bold text-royal" title="Về Dashboard">VESTA ADMIN</Link>
         </header>
         <main className="min-w-0 flex-1 p-4 sm:p-6">{children}</main>
       </div>
