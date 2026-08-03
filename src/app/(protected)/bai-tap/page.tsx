@@ -85,7 +85,12 @@ export default function ExerciseListPage() {
                 const vis = VIS_LABELS[ex.visibility] || VIS_LABELS.PUBLIC;
                 return (
                   <tr key={ex.id} className="border-b border-silver/10 hover:bg-cream/50">
-                    <td className="px-4 py-3 font-medium text-[#1a1a2e]">{ex.title}</td>
+                    <td className="px-4 py-3 font-medium text-[#1a1a2e]">
+                      {/* Bấm tiêu đề → xem như học sinh (làm thử) */}
+                      <Link href={`/bai-tap/${ex.id}/xem`} className="hover:text-royal hover:underline" title="Xem như học sinh (làm thử)">
+                        {ex.title}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3"><span className="rounded bg-cream px-2 py-0.5 text-xs text-muted">{ex.type}</span></td>
                     <td className="px-4 py-3 text-muted">{count}</td>
                     <td className="px-4 py-3">
@@ -106,8 +111,10 @@ export default function ExerciseListPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
+                      {/* Xem như học sinh — mọi vai đều thấy */}
+                      <Link href={`/bai-tap/${ex.id}/xem`} title="Xem như học sinh (làm thử)" className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Eye size={14} /></Link>
                       <Link href={`/bai-tap/${ex.id}/thong-ke`} title="Thống kê" className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><BarChart3 size={14} /></Link>
-                      {canEdit ? (
+                      {canEdit && (
                         <>
                           <button onClick={() => handleDuplicate(ex.id)} disabled={dupId === ex.id} title="Nhân bản (tạo bản nháp cùng format)"
                             className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal disabled:opacity-40">
@@ -116,8 +123,6 @@ export default function ExerciseListPage() {
                           <Link href={`/bai-tap/${ex.id}/sua`} title="Sửa" className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><PenTool size={14} /></Link>
                           <button onClick={() => handleDelete(ex.id)} title="Xoá" className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
                         </>
-                      ) : (
-                        <Link href={`/bai-tap/${ex.id}/xem`} title="Xem bài + đáp án" className="inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Eye size={14} /></Link>
                       )}
                     </td>
                   </tr>
