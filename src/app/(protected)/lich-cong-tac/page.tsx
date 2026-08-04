@@ -3,7 +3,7 @@
 // Desktop/tablet-ngang (≥lg): lưới ca×phòng×ngày. Mobile/tablet-dọc (<lg): view chọn 1 ngày, liệt kê dọc.
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, Trash2, Download, Loader2, X, Check, Calendar as CalIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Trash2, Download, Loader2, X, Check, Copy, Calendar as CalIcon } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -78,6 +78,7 @@ export default function LichCongTacPage() {
   const [modal, setModal] = useState<any>(null);
   const [toast, setToast] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [carrying, setCarrying] = useState(false);   // đang chép từ tuần trước
   // Mobile: ngày đang chọn (mặc định hôm nay nếu trong tuần, không thì T2)
   const [mDay, setMDay] = useState(0);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -107,6 +108,18 @@ export default function LichCongTacPage() {
     const res = await api.patch(`/planner`, { type: "task", ...t, completed: !t.completed });
     if (!res.success) return notify(res.message || "Không có quyền");
     setTasks((prev) => prev.map((x) => x.id === t.id ? { ...x, completed: !x.completed } : x));
+  }
+  // Chép lịch dạy + việc chưa xong từ tuần liền trước
+  async function carryOver() {
+    if (!isAdmin) return;
+    setCarrying(true);
+    const res = await api.post(`/planner/carry-over`, { week });
+    setCarrying(false);
+    if (!res.success) return notify(res.message || "Không chép được");
+    const s = res.data?.schedule ?? 0, t = res.data?.tasks ?? 0;
+    if (s === 0 && t === 0) notify(res.message || "Tuần trước không có gì để chép");
+    else notify(`Đã chép ${s} buổi dạy${t ? ` + ${t} việc chưa xong` : ""} từ tuần trước`);
+    load();
   }
   async function exportPNG() {
     if (!exportRef.current) return;
@@ -175,6 +188,21 @@ export default function LichCongTacPage() {
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
             {/* ═══════ LỊCH ═══════ */}
             <div>
+              {/* Tuần trống → mời kế thừa tuần trước (chỉ admin) */}
+              {isAdmin && !exporting && schedule.length === 0 && (
+                <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-gold/40 bg-gold/5 p-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-bold text-royal">Tuần này chưa có lịch</div>
+                    <div className="text-xs text-muted">Chép lịch dạy + việc chưa xong từ tuần trước sang, rồi chỉnh lại nếu cần.</div>
+                  </div>
+                  <button onClick={carryOver} disabled={carrying}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-gold px-3 py-2 text-sm font-bold text-royal hover:bg-gold/90 disabled:opacity-50">
+                    {carrying ? <Loader2 size={15} className="animate-spin" /> : <Copy size={15} />}
+                    {carrying ? "Đang chép..." : "Kế thừa tuần trước"}
+                  </button>
+                </div>
+              )}
+
               {/* --- LƯỚI: chỉ hiện từ lg trở lên. Hộp cuộn 2 chiều có trần cao (tắt khi xuất ảnh để không cắt cụt). --- */}
               <div className={`hidden rounded-xl border border-silver/30 lg:block ${exporting ? "" : "max-h-[75vh] overflow-auto"}`}>
                 <div className="min-w-[900px]">
@@ -224,9 +252,7 @@ export default function LichCongTacPage() {
 
               {/* --- VIEW DỌC: chỉ hiện dưới lg (điện thoại / tablet dọc) --- */}
               <div className="lg:hidden">
-                {/* Chọn ngày — GHIM dưới header mobile (sticky), cuộn xuống vẫn thấy & đổi được ngày.
-                    top-[49px] = chiều cao header "VESTA ADMIN" (py-3 + text-lg + border). z thấp hơn header (z-30).
-                    -mx-4 sm:-mx-6 + px-* : kéo nền ngày phủ hết bề ngang khung trắng khi ghim, không hở mép. */}
+                {/* Chọn ngày — GHIM dưới header mobile (sticky), cuộn xuống vẫn thấy & đổi được ngày. */}
                 <div className="sticky top-[49px] z-20 -mx-4 mb-3 bg-white px-4 pb-2 pt-1 sm:-mx-6 sm:px-6">
                   <div className="grid grid-cols-7 gap-1">
                     {DAYS.map((d, i) => {
