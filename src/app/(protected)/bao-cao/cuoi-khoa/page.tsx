@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, Pencil, Trash2, Layers, Copy } from "lucide-react";
+import { Plus, Loader2, Pencil, Trash2, Layers, Copy, Eye } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLevels } from "@/lib/useLevels";
 export default function FinalReportListPage() {
@@ -13,6 +13,7 @@ export default function FinalReportListPage() {
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dupId, setDupId] = useState<string | null>(null);
+  const [viewId, setViewId] = useState<string | null>(null);
   const [filterCourse, setFilterCourse] = useState("");
   const [filterClassId, setFilterClassId] = useState("");
   useEffect(() => {
@@ -43,6 +44,16 @@ export default function FinalReportListPage() {
     setDupId(null);
     if (data.success && data.data?.id) router.push(`/bao-cao/cuoi-khoa/${data.data.id}`);
     else alert(data.message || "Lỗi nhân bản");
+  }
+  // Xem NHƯ HỌC SINH: report HTML có link chia sẻ công khai → mở đúng bản phụ huynh thấy.
+  // Report biểu mẫu (không có html) → mở trang xem/sửa.
+  async function handleView(id: string) {
+    setViewId(id);
+    const res = await api.get(`/final-reports/${id}`);
+    setViewId(null);
+    if (res.success && res.data?.shareUrl) window.open(res.data.shareUrl, "_blank");
+    else if (res.success) router.push(`/bao-cao/cuoi-khoa/${id}`);
+    else alert(res.message || "Không mở được báo cáo");
   }
   function fmtDate(d: string | null) {
     if (!d) return "—";
@@ -106,7 +117,9 @@ export default function FinalReportListPage() {
               {reports.map((r) => (
                 <tr key={r.id} className="border-b border-silver/10 hover:bg-cream/50">
                   <td className="px-4 py-3 font-medium text-[#1a1a2e]">
-                    {r.student?.fullName}
+                    <button onClick={() => handleView(r.id)} className="text-left hover:text-royal hover:underline" title="Xem như học sinh">
+                      {r.student?.fullName}
+                    </button>
                     <div className="text-xs font-mono text-muted">{r.student?.studentCode}</div>
                   </td>
                   <td className="px-4 py-3">
@@ -125,6 +138,10 @@ export default function FinalReportListPage() {
                   <td className="px-4 py-3 text-muted">{r.creator?.fullName || "—"}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => handleView(r.id)} disabled={viewId === r.id} title="Xem như học sinh"
+                        className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal disabled:opacity-40">
+                        {viewId === r.id ? <Loader2 size={15} className="animate-spin" /> : <Eye size={15} />}
+                      </button>
                       <button onClick={() => handleDuplicate(r.id)} disabled={dupId === r.id} title="Nhân bản (tạo bản nháp cùng format)"
                         className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal disabled:opacity-40">
                         {dupId === r.id ? <Loader2 size={15} className="animate-spin" /> : <Copy size={15} />}
