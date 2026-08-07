@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Send, Search, Check } from "lucide-react";
+import { ArrowLeft, Send, Search, Check, Code, Eye } from "lucide-react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 
@@ -13,6 +13,7 @@ export default function SendNotificationPage() {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
+  const [msgTab, setMsgTab] = useState<"edit" | "preview">("edit");
   const [mode, setMode] = useState<"all" | "select">("all");
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -20,7 +21,6 @@ export default function SendNotificationPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
 
-  // Fetch students khi chọn mode "select"
   useEffect(() => {
     if (mode === "select") {
       api.get("/users?role=STUDENT&limit=200").then((data) => {
@@ -84,9 +84,31 @@ export default function SendNotificationPage() {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-royal">Nội dung *</label>
-          <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4}
-            placeholder="Nhập nội dung thông báo..." className="input-field" />
+          <div className="mb-1 flex items-center justify-between">
+            <label className="block text-sm font-medium text-royal">Nội dung *</label>
+            <div className="flex gap-1">
+              <button type="button" onClick={() => setMsgTab("edit")}
+                className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold ${msgTab === "edit" ? "bg-royal text-white" : "bg-cream text-muted hover:text-royal"}`}>
+                <Code size={12} />Soạn / Dán HTML
+              </button>
+              <button type="button" onClick={() => setMsgTab("preview")}
+                className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold ${msgTab === "preview" ? "bg-royal text-white" : "bg-cream text-muted hover:text-royal"}`}>
+                <Eye size={12} />Xem trước
+              </button>
+            </div>
+          </div>
+          {msgTab === "edit" ? (
+            <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={8}
+              placeholder="Gõ chữ thường, hoặc dán mã HTML (VD: <b>Chú ý</b>, <a href='...'>link</a>, bảng, màu...)."
+              className="input-field font-mono text-sm" />
+          ) : (
+            <div className="min-h-[180px] rounded-lg border border-silver/40 bg-white p-3 text-sm">
+              {message.trim()
+                ? <div dangerouslySetInnerHTML={{ __html: message }} />
+                : <span className="text-muted">Chưa có nội dung để xem trước.</span>}
+            </div>
+          )}
+          <p className="mt-1 text-[0.7rem] text-muted">Dán HTML được (in đậm, link, bảng, màu...). Học viên sẽ thấy đúng định dạng này.</p>
         </div>
 
         {/* Mode select */}
