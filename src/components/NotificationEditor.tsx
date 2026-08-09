@@ -1,7 +1,8 @@
-// FILE: src/components/NotificationEditor.tsx — Editor thông báo:
-// Soạn trực tiếp trên iframe (giữ NGUYÊN HTML/CSS/font) + thanh format như blog + Dán HTML + Xem trước.
+// FILE: src/components/NotificationEditor.tsx — Editor thông báo (giữ nguyên HTML/CSS/font).
+// Nguyên tắc chống đơ: iframe nạp HTML 1 LẦN khi mở tab Soạn; trong lúc gõ React KHÔNG đụng iframe.
+// Chỉ đọc nội dung ra (onChange) khi RỜI tab Soạn hoặc bấm nút format.
 "use client";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight,
   Link2, RemoveFormatting, Code, Eye, PencilLine,
@@ -18,60 +19,51 @@ function ensureDoc(html: string): string {
 }
 
 export default function NotificationEditor({ value, onChange }: { value: string; onChange: (html: string) => void }) {
-  const [tab, setTab] = useState<Tab>("write");
+  const [tab, setTabState] = useState<Tab>("code"); // mở mặc định ở Mã HTML để dán nhanh; qua Soạn để gõ
   const frameRef = useRef<HTMLIFrameElement | null>(null);
-  const selfEditRef = useRef(false);       // đánh dấu value đang đổi DO gõ trong iframe (không nạp lại)
+  const valueRef = useRef(value);
+  valueRef.current = value;
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  // Ghi nội dung iframe ra ngoài — KHÔNG gây nạp lại iframe (nhờ selfEditRef).
-  const serialize = useCallback(() => {
+  // Đọc HTML hiện tại trong iframe (không set contentEditable off/on để tránh nháy)
+  function readFrame(): string | null {
+    const doc = frameRef.current?.contentDocument;
+    if (!doc || !doc.documentElement) return null;
+    return (doc.doctype ? "<!doctype html>\n" : "") + doc.documentElement.outerHTML;
+  }
+  // Nạp HTML vào iframe + bật sửa (gọi khi MỞ tab Soạn)
+  function loadFrame(html: string) {
     const doc = frameRef.current?.contentDocument;
     if (!doc) return;
-    doc.body?.removeAttribute("contenteditable");
-    const out = (doc.doctype ? "<!doctype html>\n" : "") + (doc.documentElement?.outerHTML || "");
-    doc.body?.setAttribute("contenteditable", "true");
-    selfEditRef.current = true;            // báo: thay đổi này là từ chính iframe
-    onChangeRef.current(out);
-  }, []);
-
-  // Chỉ nạp lại iframe khi: đổi sang tab Soạn. KHÔNG phụ thuộc `value` → gõ không bị văng con trỏ.
-  useEffect(() => {
-    if (tab !== "write") return;
-    const frame = frameRef.current;
-    const doc = frame?.contentDocument;
-    if (!doc) return;
     doc.open();
-    doc.write(ensureDoc(value));
+    doc.write(ensureDoc(html));
     doc.close();
     const body = doc.body;
     if (body) {
       body.setAttribute("contenteditable", "true");
       (body.style as any).outline = "none";
-      body.addEventListener("input", serialize);
     }
+  }
+
+  // Chuyển tab: nếu ĐANG rời tab Soạn → đọc nội dung iframe ra trước.
+  // Nếu ĐANG vào tab Soạn → nạp value hiện tại vào iframe.
+  function setTab(next: Tab) {
+    if (tab === "write" && next !== "write") {
+      const html = readFrame();
+      if (html != null) onChangeRef.current(html);
+    }
+    setTabState(next);
+  }
+
+  // Khi ở tab Soạn: nạp iframe 1 lần lúc vào tab. KHÔNG phụ thuộc value → gõ không bị đụng.
+  useEffect(() => {
+    if (tab !== "write") return;
+    loadFrame(valueRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
-  // Khi value đổi TỪ NGOÀI (dán ở tab Mã HTML) mà đang ở tab Soạn → nạp lại 1 lần.
-  // Nếu value đổi do chính mình gõ (selfEditRef) → bỏ qua, giữ con trỏ.
-  useEffect(() => {
-    if (tab !== "write") return;
-    if (selfEditRef.current) { selfEditRef.current = false; return; }
-    const doc = frameRef.current?.contentDocument;
-    if (!doc) return;
-    doc.open();
-    doc.write(ensureDoc(value));
-    doc.close();
-    const body = doc.body;
-    if (body) {
-      body.setAttribute("contenteditable", "true");
-      (body.style as any).outline = "none";
-      body.addEventListener("input", serialize);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
-
+  // Nút format: thao tác trên iframe rồi đọc lại ra ngoài (không nạp lại iframe)
   function cmd(command: string, val?: string) {
     const doc = frameRef.current?.contentDocument;
     if (!doc) return;
@@ -80,7 +72,8 @@ export default function NotificationEditor({ value, onChange }: { value: string;
       if (command === "foreColor") doc.execCommand("styleWithCSS", false, "true");
       doc.execCommand(command, false, val);
     } catch {}
-    serialize();
+    const html = readFrame();
+    if (html != null) onChangeRef.current(html);
   }
   function addLink() { const u = prompt("Nhập link (https://...):"); if (u) cmd("createLink", u); }
 
@@ -98,7 +91,7 @@ export default function NotificationEditor({ value, onChange }: { value: string;
         {tbn("preview", <Eye size={13} />, "Xem trước")}
       </div>
 
-      {/* Giữ iframe LUÔN mount (chỉ ẩn/hiện) để không bị dựng lại → không mất nội dung/con trỏ */}
+      {/* iframe LUÔN mount, chỉ ẩn/hiện — không bị dựng lại */}
       <div style={{ display: tab === "write" ? "block" : "none" }}>
         <div className="rounded-lg border border-silver/40">
           <div className="flex flex-wrap items-center gap-1 border-b border-silver/30 bg-gray-50 p-1.5">
@@ -124,11 +117,12 @@ export default function NotificationEditor({ value, onChange }: { value: string;
           </div>
           <iframe ref={frameRef} title="soan-thong-bao" className="h-[300px] w-full rounded-b-lg bg-white"/>
         </div>
+        <p className="mt-1 text-[0.7rem] text-muted">Gõ trong ô này, hoặc dán HTML ở tab <b>Mã HTML</b> rồi qua đây chỉnh chữ. Khi gửi/đổi tab, nội dung tự lưu.</p>
       </div>
 
       {tab === "code" && (
         <textarea value={value} onChange={(e)=>onChange(e.target.value)} rows={12} spellCheck={false}
-          placeholder="Dán mã HTML (giữ nguyên style/font). Xong sang tab Soạn để chỉnh chữ + định dạng."
+          placeholder="Dán mã HTML (giữ nguyên style/font). Xong sang tab Soạn để chỉnh chữ."
           className="w-full resize-y rounded-lg border border-silver/40 bg-white p-3 font-mono text-xs leading-relaxed outline-none focus:border-gold"/>
       )}
 
