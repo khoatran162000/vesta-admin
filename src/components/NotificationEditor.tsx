@@ -9,7 +9,6 @@ import {
 
 type Tab = "write" | "code" | "preview";
 
-// HTML rời (không có <html>) → bọc thành tài liệu tối thiểu để soạn/hiển thị nhất quán.
 function ensureDoc(html: string): string {
   const s = (html || "").trim();
   if (/<html[\s>]/i.test(s) || /<!doctype/i.test(s)) return s;
@@ -21,30 +20,30 @@ function ensureDoc(html: string): string {
 export default function NotificationEditor({ value, onChange }: { value: string; onChange: (html: string) => void }) {
   const [tab, setTab] = useState<Tab>("write");
   const frameRef = useRef<HTMLIFrameElement | null>(null);
-  const loadedRef = useRef<string>("\u0000"); // giá trị đã nạp vào iframe (tránh nạp đè khi đang gõ)
+  const selfEditRef = useRef(false);       // đánh dấu value đang đổi DO gõ trong iframe (không nạp lại)
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
+  // Ghi nội dung iframe ra ngoài — KHÔNG gây nạp lại iframe (nhờ selfEditRef).
   const serialize = useCallback(() => {
     const doc = frameRef.current?.contentDocument;
     if (!doc) return;
     doc.body?.removeAttribute("contenteditable");
     const out = (doc.doctype ? "<!doctype html>\n" : "") + (doc.documentElement?.outerHTML || "");
     doc.body?.setAttribute("contenteditable", "true");
-    loadedRef.current = out;   // đánh dấu đã đồng bộ → không reload (giữ con trỏ)
-    onChange(out);
-  }, [onChange]);
+    selfEditRef.current = true;            // báo: thay đổi này là từ chính iframe
+    onChangeRef.current(out);
+  }, []);
 
-  // Nạp value vào iframe khi vào tab Soạn hoặc value đổi từ ngoài (dán ở tab Mã HTML).
+  // Chỉ nạp lại iframe khi: đổi sang tab Soạn. KHÔNG phụ thuộc `value` → gõ không bị văng con trỏ.
   useEffect(() => {
     if (tab !== "write") return;
     const frame = frameRef.current;
-    if (!frame) return;
-    if (loadedRef.current === value && frame.contentDocument?.body) return;
-    const doc = frame.contentDocument;
+    const doc = frame?.contentDocument;
     if (!doc) return;
     doc.open();
     doc.write(ensureDoc(value));
     doc.close();
-    loadedRef.current = value;
     const body = doc.body;
     if (body) {
       body.setAttribute("contenteditable", "true");
@@ -52,7 +51,26 @@ export default function NotificationEditor({ value, onChange }: { value: string;
       body.addEventListener("input", serialize);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, value]);
+  }, [tab]);
+
+  // Khi value đổi TỪ NGOÀI (dán ở tab Mã HTML) mà đang ở tab Soạn → nạp lại 1 lần.
+  // Nếu value đổi do chính mình gõ (selfEditRef) → bỏ qua, giữ con trỏ.
+  useEffect(() => {
+    if (tab !== "write") return;
+    if (selfEditRef.current) { selfEditRef.current = false; return; }
+    const doc = frameRef.current?.contentDocument;
+    if (!doc) return;
+    doc.open();
+    doc.write(ensureDoc(value));
+    doc.close();
+    const body = doc.body;
+    if (body) {
+      body.setAttribute("contenteditable", "true");
+      (body.style as any).outline = "none";
+      body.addEventListener("input", serialize);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
 
   function cmd(command: string, val?: string) {
     const doc = frameRef.current?.contentDocument;
@@ -67,7 +85,7 @@ export default function NotificationEditor({ value, onChange }: { value: string;
   function addLink() { const u = prompt("Nhập link (https://...):"); if (u) cmd("createLink", u); }
 
   const b = "flex items-center justify-center rounded p-1.5 text-gray-600 hover:bg-gray-200";
-  const tb = (t: Tab, icon: React.ReactNode, label: string) => (
+  const tbn = (t: Tab, icon: React.ReactNode, label: string) => (
     <button type="button" onClick={() => setTab(t)}
       className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold ${tab === t ? "bg-royal text-white" : "bg-cream text-muted hover:text-royal"}`}>{icon}{label}</button>
   );
@@ -75,12 +93,13 @@ export default function NotificationEditor({ value, onChange }: { value: string;
   return (
     <div>
       <div className="mb-2 flex flex-wrap gap-1">
-        {tb("write", <PencilLine size={13} />, "Soạn")}
-        {tb("code", <Code size={13} />, "Mã HTML")}
-        {tb("preview", <Eye size={13} />, "Xem trước")}
+        {tbn("write", <PencilLine size={13} />, "Soạn")}
+        {tbn("code", <Code size={13} />, "Mã HTML")}
+        {tbn("preview", <Eye size={13} />, "Xem trước")}
       </div>
 
-      {tab === "write" && (
+      {/* Giữ iframe LUÔN mount (chỉ ẩn/hiện) để không bị dựng lại → không mất nội dung/con trỏ */}
+      <div style={{ display: tab === "write" ? "block" : "none" }}>
         <div className="rounded-lg border border-silver/40">
           <div className="flex flex-wrap items-center gap-1 border-b border-silver/30 bg-gray-50 p-1.5">
             <button type="button" title="Đậm" onMouseDown={(e)=>e.preventDefault()} onClick={()=>cmd("bold")} className={`${b} font-bold`}><Bold size={15}/></button>
@@ -105,7 +124,7 @@ export default function NotificationEditor({ value, onChange }: { value: string;
           </div>
           <iframe ref={frameRef} title="soan-thong-bao" className="h-[300px] w-full rounded-b-lg bg-white"/>
         </div>
-      )}
+      </div>
 
       {tab === "code" && (
         <textarea value={value} onChange={(e)=>onChange(e.target.value)} rows={12} spellCheck={false}
