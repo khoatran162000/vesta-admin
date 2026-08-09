@@ -1,7 +1,7 @@
 // FILE: src/app/(protected)/thong-bao/gui-moi/page.tsx — Gui thong bao (tat ca hoac chon nguoi)
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Send, Search, Check } from "lucide-react";
 import Link from "next/link";
@@ -14,6 +14,7 @@ export default function SendNotificationPage() {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
+  const flushRef = useRef<(() => string) | null>(null);
   const [mode, setMode] = useState<"all" | "select">("all");
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -53,7 +54,12 @@ export default function SendNotificationPage() {
   const isEmpty = message.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, "").trim() === "";
 
   async function handleSend() {
-    if (!title || isEmpty) return;
+    const latestMsg = flushRef.current ? flushRef.current() : message;
+    const latestEmpty = latestMsg.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, "").trim() === "";
+    if (!title.trim() || latestEmpty) {
+      setError(!title.trim() ? "Vui lòng nhập tiêu đề" : "Vui lòng nhập nội dung");
+      return;
+    }
     if (mode === "select" && selectedIds.length === 0) {
       setError("Chưa chọn học viên nào");
       return;
@@ -61,7 +67,7 @@ export default function SendNotificationPage() {
 
     setSending(true); setError("");
     try {
-      const body: any = { title, message, type: "TEACHER_WARNING" };
+      const body: any = { title, message: latestMsg, type: "TEACHER_WARNING" };
       if (mode === "all") body.sendToAll = true;
       else body.userIds = selectedIds;
 
@@ -89,7 +95,7 @@ export default function SendNotificationPage() {
 
         <div>
           <label className="mb-1 block text-sm font-medium text-royal">Nội dung *</label>
-          <NotificationEditor value={message} onChange={setMessage} />
+          <NotificationEditor value={message} onChange={setMessage} flushRef={flushRef} />
           <p className="mt-1 text-[0.7rem] text-muted">Soạn có thanh định dạng như blog, hoặc dán HTML ở tab Mã HTML rồi chỉnh chữ ở tab Soạn. Học viên sẽ thấy đúng định dạng này.</p>
         </div>
 
@@ -145,7 +151,7 @@ export default function SendNotificationPage() {
           </div>
         )}
 
-        <button onClick={handleSend} disabled={sending || !title || isEmpty} className="btn-primary w-full justify-center">
+        <button onClick={handleSend} disabled={sending || !title.trim()} className="btn-primary w-full justify-center">
           <Send size={15} />{sending ? "Đang gửi..." : `Gửi thông báo${mode === "select" ? ` (${selectedIds.length} người)` : " (tất cả)"}`}
         </button>
       </div>

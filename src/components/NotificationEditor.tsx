@@ -18,13 +18,29 @@ function ensureDoc(html: string): string {
 </head><body>${s}</body></html>`;
 }
 
-export default function NotificationEditor({ value, onChange }: { value: string; onChange: (html: string) => void }) {
+export default function NotificationEditor({ value, onChange, flushRef }: {
+  value: string; onChange: (html: string) => void;
+  flushRef?: React.MutableRefObject<(() => string) | null>;
+}) {
   const [tab, setTabState] = useState<Tab>("code"); // mở mặc định ở Mã HTML để dán nhanh; qua Soạn để gõ
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const valueRef = useRef(value);
   valueRef.current = value;
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+
+  // Cho trang cha đọc nội dung mới nhất từ iframe (khi bấm Gửi mà chưa đổi tab)
+  useEffect(() => {
+    if (!flushRef) return;
+    flushRef.current = () => {
+      if (tab === "write") {
+        const html = readFrame();
+        if (html != null) { onChangeRef.current(html); return html; }
+      }
+      return valueRef.current;
+    };
+    return () => { if (flushRef) flushRef.current = null; };
+  });
 
   // Đọc HTML hiện tại trong iframe (không set contentEditable off/on để tránh nháy)
   function readFrame(): string | null {
