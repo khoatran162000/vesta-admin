@@ -43,10 +43,11 @@ export default function SendNotificationPage() {
     }
   }
 
-  const filteredStudents = students.filter((s) =>
-    s.fullName.toLowerCase().includes(searchInput.toLowerCase()) ||
-    s.email.toLowerCase().includes(searchInput.toLowerCase())
-  );
+  const filteredStudents = students.filter((s) => {
+    const q = searchInput.toLowerCase();
+    return (s.fullName || "").toLowerCase().includes(q) ||
+           (s.email || "").toLowerCase().includes(q);
+  });
 
   // Bỏ thẻ để kiểm tra rỗng (tránh gửi thông báo chỉ có <p></p>)
   const isEmpty = message.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, "").trim() === "";
@@ -134,7 +135,7 @@ export default function SendNotificationPage() {
                     </div>
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-[#1a1a2e]">{s.fullName}</p>
-                      <p className="truncate text-[0.7rem] text-muted">{s.email}</p>
+                      <p className="truncate text-[0.7rem] text-muted">{s.email || "—"}</p>
                     </div>
                   </button>
                 );
