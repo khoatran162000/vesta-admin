@@ -1,218 +1,115 @@
-// FILE: src/app/(protected)/lich-hoc/page.tsx — Lịch học cả năm
+// FILE: src/app/(protected)/lich-hoc/page.tsx — Trình quản lý Lịch làm bài cả năm (3a: xem)
 "use client";
-import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Save, Loader2, X, PenTool } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, RefreshCw, ExternalLink, CalendarDays } from "lucide-react";
 import { api } from "@/lib/api";
-import { useLevels } from "@/lib/useLevels";
 
-const STATUS_OPTIONS = [
-  { value: "UPCOMING", label: "Sắp khai giảng", color: "bg-blue-50 text-blue-700" },
-  { value: "ONGOING", label: "Đang học", color: "bg-green-50 text-green-700" },
-  { value: "COMPLETED", label: "Đã kết thúc", color: "bg-gray-100 text-gray-500" },
-  { value: "CANCELLED", label: "Đã huỷ", color: "bg-red-50 text-red-600" },
-];
+type Day = { d: string; w: string; h?: string; l?: string };
+type Week = { i: number; u: number; d: Day[] };
+type Cls = { id: string; kg: string; r: string; w: Week[] };
+type CalData = Record<string, Cls[]>;
 
-export default function SchedulePage() {
-  const COURSES = useLevels();
-  const [schedules, setSchedules] = useState<any[]>([]);
+const dowColor: Record<string, string> = {
+  T2: "bg-red-50 text-red-600", T3: "bg-orange-50 text-orange-600", T4: "bg-green-50 text-green-700",
+  T5: "bg-blue-50 text-blue-700", T6: "bg-purple-50 text-purple-700", T7: "bg-teal-50 text-teal-700", CN: "bg-pink-50 text-pink-700",
+};
+const fdShort = (s: string) => { const p = s.split("-"); return p[2] + "/" + p[1]; };
+
+export default function LichHocPage() {
+  const [data, setData] = useState<CalData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState({ course: "", status: "", year: String(new Date().getFullYear()) });
-  const [showModal, setShowModal] = useState(false);
-  const [editItem, setEditItem] = useState<any>(null);
+  const [lv, setLv] = useState("");
+  const [clsId, setClsId] = useState("");
 
-  const loadData = useCallback(async () => {
+  async function load() {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (filter.course) params.set("course", filter.course);
-    if (filter.status) params.set("status", filter.status);
-    if (filter.year) params.set("year", filter.year);
-    const json = await api.get(`/schedule?${params}`);
-    setSchedules(json.data || []);
+    try {
+      const res = await api.get("/site-content/calendar_all");
+      const d = res?.data?.data;
+      if (d && Object.keys(d).length) {
+        setData(d);
+        const startLv = Object.keys(d).includes("6+") ? "6+" : Object.keys(d)[0];
+        setLv(startLv);
+        setClsId(d[startLv]?.[0]?.id || "");
+      } else setData(null);
+    } catch { setData(null); }
     setLoading(false);
-  }, [filter]);
-
-  useEffect(() => { loadData(); }, [loadData]);
-
-  async function handleSave(formData: any) {
-    const url = editItem?.id ? `/schedule/${editItem.id}` : "/schedule";
-    const json = await (editItem?.id ? api.put(url, formData) : api.post(url, formData));
-    if (!json.success) { alert(json.message || "Lỗi lưu"); return; }
-    setShowModal(false);
-    setEditItem(null);
-    loadData();
   }
+  useEffect(() => { load(); }, []);
 
-  async function handleDelete(id: string) {
-    if (!confirm("Xác nhận xoá lịch học này?")) return;
-    await api.delete(`/schedule/${id}`);
-    loadData();
-  }
+  const levels = useMemo(() => (data ? Object.keys(data) : []), [data]);
+  const classes = useMemo(() => ((data && lv ? data[lv] : []) || []), [data, lv]);
+  const cls = useMemo(() => classes.find((c) => c.id === clsId) || null, [classes, clsId]);
 
-  function getStatusBadge(status: string) {
-    const s = STATUS_OPTIONS.find((o) => o.value === status);
-    if (!s) return null;
-    return <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.color}`}>{s.label}</span>;
-  }
+  function pickLv(l: string) { setLv(l); setClsId(data?.[l]?.[0]?.id || ""); }
+
+  if (loading) return <div className="flex items-center justify-center py-24"><Loader2 className="animate-spin text-gold" size={28} /></div>;
+
+  if (!data) return (
+    <div className="mx-auto max-w-[900px] py-24 text-center">
+      <p className="text-muted">Chưa có dữ liệu lịch làm bài.</p>
+      <button onClick={load} className="btn-secondary mt-4"><RefreshCw size={14} />Tải lại</button>
+    </div>
+  );
 
   return (
     <div className="mx-auto max-w-[1200px]">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-5 flex items-center justify-between">
         <div>
-          <h2 className="font-display text-2xl font-bold text-royal">📅 Lịch Học Cả Năm</h2>
-          <p className="mt-1 text-sm text-muted">{schedules.length} lớp trong năm {filter.year}</p>
+          <h2 className="font-display text-2xl font-bold text-royal flex items-center gap-2"><CalendarDays size={22} />Lịch làm bài cả năm</h2>
+          <p className="mt-1 text-sm text-muted">{levels.length} trình độ · {Object.values(data).reduce((a, c) => a + c.length, 0)} lớp</p>
         </div>
-        <button onClick={() => { setEditItem(null); setShowModal(true); }} className="btn-primary">
-          <Plus size={16} />Thêm lớp mới
-        </button>
+        <div className="flex gap-2">
+          <button onClick={load} className="btn-secondary"><RefreshCw size={14} />Tải lại</button>
+          <a href="https://vestaedu.online/lich-lam-bai" target="_blank" rel="noopener noreferrer" className="btn-secondary"><ExternalLink size={14} />Xem trang HV</a>
+        </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-3">
-        <select value={filter.year} onChange={(e) => setFilter({ ...filter, year: e.target.value })}
-          className="rounded-lg border border-silver/40 bg-white px-4 py-2 text-sm outline-none focus:border-gold">
-          {[2025, 2026, 2027, 2028].map((y) => <option key={y} value={y}>Năm {y}</option>)}
-        </select>
-        <select value={filter.course} onChange={(e) => setFilter({ ...filter, course: e.target.value })}
-          className="rounded-lg border border-silver/40 bg-white px-4 py-2 text-sm outline-none focus:border-gold">
-          <option value="">Tất cả khoá</option>
-          {COURSES.map((c) => <option key={c} value={c}>Khoá {c}</option>)}
-        </select>
-        <select value={filter.status} onChange={(e) => setFilter({ ...filter, status: e.target.value })}
-          className="rounded-lg border border-silver/40 bg-white px-4 py-2 text-sm outline-none focus:border-gold">
-          <option value="">Tất cả trạng thái</option>
-          {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
-      </div>
-
-      <div className="overflow-x-auto rounded-xl border border-silver/30 bg-white">
-        {loading ? (
-          <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-gold" /></div>
-        ) : schedules.length === 0 ? (
-          <div className="py-16 text-center text-sm text-muted">Chưa có lịch học nào.</div>
-        ) : (
-          <table className="w-full text-left text-sm">
-            <thead><tr className="border-b bg-cream">
-              <th className="px-4 py-3 font-semibold text-royal">Lớp</th>
-              <th className="px-4 py-3 font-semibold text-royal">Khoá</th>
-              <th className="px-4 py-3 font-semibold text-royal">Bắt đầu</th>
-              <th className="px-4 py-3 font-semibold text-royal">Kết thúc</th>
-              <th className="px-4 py-3 font-semibold text-royal">Lịch học</th>
-              <th className="px-4 py-3 font-semibold text-royal">GV</th>
-              <th className="px-4 py-3 font-semibold text-royal">Sĩ số</th>
-              <th className="px-4 py-3 font-semibold text-royal">Trạng thái</th>
-              <th className="px-4 py-3 text-right font-semibold text-royal">Thao tác</th>
-            </tr></thead>
-            <tbody>
-              {schedules.map((s) => (
-                <tr key={s.id} className="border-b border-silver/10 hover:bg-cream/50">
-                  <td className="px-4 py-3 font-medium text-[#1a1a2e]">{s.className}</td>
-                  <td className="px-4 py-3"><span className="rounded-full bg-royal/8 px-2 py-0.5 text-xs font-semibold text-royal">{s.course}</span></td>
-                  <td className="px-4 py-3 text-muted">{new Date(s.startDate).toLocaleDateString("vi-VN")}</td>
-                  <td className="px-4 py-3 text-muted">{new Date(s.endDate).toLocaleDateString("vi-VN")}</td>
-                  <td className="px-4 py-3 text-xs text-muted">{s.schedule}</td>
-                  <td className="px-4 py-3 text-muted">{s.teacher || "—"}</td>
-                  <td className="px-4 py-3">
-                    <span className={s.currentStudents >= s.maxStudents ? "font-bold text-red-600" : "text-muted"}>
-                      {s.currentStudents}/{s.maxStudents}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">{getStatusBadge(s.status)}</td>
-                  <td className="px-4 py-3 text-right">
-                    <button onClick={() => { setEditItem(s); setShowModal(true); }} className="mr-1 rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><PenTool size={14} /></button>
-                    <button onClick={() => handleDelete(s.id)} className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {showModal && <ScheduleModal item={editItem} onClose={() => { setShowModal(false); setEditItem(null); }} onSave={handleSave} />}
-    </div>
-  );
-}
-
-function ScheduleModal({ item, onClose, onSave }: { item: any; onClose: () => void; onSave: (d: any) => void }) {
-  const COURSES = useLevels();
-  const [form, setForm] = useState<any>(item || { maxStudents: 15, status: "UPCOMING" });
-  const [saving, setSaving] = useState(false);
-  const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }));
-
-  async function handleSubmit() {
-    setSaving(true);
-    await onSave(form);
-    setSaving(false);
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/40 px-4">
-      <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-display text-xl font-bold text-royal">{item ? "Sửa lịch học" : "Thêm lớp mới"}</h3>
-          <button onClick={onClose} className="text-muted hover:text-royal"><X size={20} /></button>
-        </div>
-
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-bold text-muted">Tên lớp</label>
-            <input type="text" value={form.className || ""} onChange={(e) => set("className", e.target.value)} placeholder="VD: 7+ 12/2025 - 01/2026" className="input-field" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-bold text-muted">Khoá học</label>
-              <select value={form.course || ""} onChange={(e) => set("course", e.target.value)} className="input-field">
-                <option value="">— Chọn —</option>
-                {COURSES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-muted">Giáo viên</label>
-              <input type="text" value={form.teacher || ""} onChange={(e) => set("teacher", e.target.value)} placeholder="Ms. Ly Le" className="input-field" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-bold text-muted">Khai giảng</label>
-              <input type="date" value={form.startDate?.slice?.(0, 10) || ""} onChange={(e) => set("startDate", e.target.value)} className="input-field" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-muted">Kết thúc</label>
-              <input type="date" value={form.endDate?.slice?.(0, 10) || ""} onChange={(e) => set("endDate", e.target.value)} className="input-field" />
-            </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold text-muted">Lịch học</label>
-            <input type="text" value={form.schedule || ""} onChange={(e) => set("schedule", e.target.value)} placeholder="T2,4,6 19:30-21:30" className="input-field" />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-bold text-muted">Phòng</label>
-              <input type="text" value={form.room || ""} onChange={(e) => set("room", e.target.value)} className="input-field" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-muted">Sĩ số tối đa</label>
-              <input type="number" value={form.maxStudents || 15} onChange={(e) => set("maxStudents", parseInt(e.target.value))} className="input-field" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-bold text-muted">Trạng thái</label>
-              <select value={form.status || "UPCOMING"} onChange={(e) => set("status", e.target.value)} className="input-field">
-                {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold text-muted">Ghi chú</label>
-            <textarea value={form.notes || ""} onChange={(e) => set("notes", e.target.value)} rows={2} className="input-field resize-none" />
-          </div>
-        </div>
-
-        <div className="mt-5 flex items-center justify-end gap-3">
-          <button onClick={onClose} className="btn-secondary">Huỷ</button>
-          <button onClick={handleSubmit} disabled={saving} className="btn-primary">
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}Lưu
+      <div className="mb-3 flex flex-wrap gap-2">
+        {levels.map((l) => (
+          <button key={l} onClick={() => pickLv(l)}
+            className={`rounded-full px-4 py-1.5 text-sm font-bold border-2 transition ${l === lv ? "bg-royal text-white border-royal" : "border-silver/40 text-muted hover:border-gold"}`}>
+            IELTS {l}
           </button>
-        </div>
+        ))}
       </div>
+
+      <div className="mb-5 flex flex-wrap gap-2">
+        {classes.map((c) => (
+          <button key={c.id} onClick={() => setClsId(c.id)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition text-left ${c.id === clsId ? "bg-royal text-white border-royal" : "bg-white border-silver/30 text-muted hover:border-gold"}`}>
+            <div>{c.id}</div><div className="text-[0.65rem] opacity-80">{c.r}</div>
+          </button>
+        ))}
+      </div>
+
+      {cls && (
+        <div className="space-y-4">
+          {cls.w.map((wk) => (
+            <div key={wk.i} className="rounded-xl border border-silver/30 bg-white p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="rounded bg-gold/12 px-2 py-0.5 text-[0.7rem] font-bold text-gold-dark">{wk.i < 0 ? "PRE" : "TUẦN " + (wk.i + 1)}</span>
+                <span className="font-display font-semibold text-royal">{wk.i < 0 ? "Trước KG" : "Unit " + wk.u}</span>
+                {wk.d[0] && <span className="ml-auto text-xs text-muted">{fdShort(wk.d[0].d)} – {fdShort(wk.d[wk.d.length - 1].d)}</span>}
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                {wk.d.map((day) => (
+                  <div key={day.d} className="rounded-lg border border-silver/20 p-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-[#1a1a2e]">{Number(day.d.split("-")[2])}</span>
+                      <span className={`rounded px-1.5 py-0.5 text-[0.6rem] font-bold ${dowColor[day.w] || ""}`}>{day.w}</span>
+                    </div>
+                    <div className="mt-1 min-h-[2.2rem]">
+                      <div className="text-[0.8rem] font-semibold text-royal">{day.h || "—"}</div>
+                      {day.l && <a href={day.l} target="_blank" rel="noopener noreferrer" className="mt-0.5 block truncate text-[0.65rem] text-blue-600 hover:underline" title={day.l}>🔗 link</a>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
