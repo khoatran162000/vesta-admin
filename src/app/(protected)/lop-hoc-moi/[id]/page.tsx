@@ -135,6 +135,8 @@ export default function ClassDetailPage() {
                 <thead><tr className="border-b bg-cream">
                   <th className="px-4 py-3 font-semibold text-royal">Học viên</th>
                   <th className="px-4 py-3 font-semibold text-royal">Mã HV</th>
+                  <th className="px-4 py-3 font-semibold text-royal">Email</th>
+                  <th className="px-4 py-3 font-semibold text-royal">SĐT</th>
                   <th className="px-4 py-3 font-semibold text-royal">Trạng thái học</th>
                   <th className="px-4 py-3 text-right font-semibold text-royal">Thao tác</th>
                 </tr></thead>
@@ -143,6 +145,8 @@ export default function ClassDetailPage() {
                     <tr key={e.id} className="border-b border-silver/10 hover:bg-cream/50">
                       <td className="px-4 py-3 font-medium text-[#1a1a2e]">{e.student.fullName}</td>
                       <td className="px-4 py-3 font-mono text-xs text-royal">{e.student.studentCode || "—"}</td>
+                      <td className="px-4 py-3 text-xs text-muted">{e.student.email || "—"}</td>
+                      <td className="px-4 py-3 text-xs text-muted">{e.student.phone || "—"}</td>
                       <td className="px-4 py-3">
                         <select value={e.status} onChange={(ev) => setStatus(e.student.id, ev.target.value)}
                           className={`rounded-full border-0 px-2.5 py-0.5 text-xs font-bold outline-none ${ENROLL_STATUS[e.status]?.cls || "bg-gray-100 text-gray-600"}`}>
