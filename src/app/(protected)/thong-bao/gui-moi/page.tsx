@@ -161,6 +161,20 @@ export default function SendNotificationPage() {
                 {selectedIds.length === filteredStudents.length && filteredStudents.length > 0 ? "Bỏ chọn tất cả" : "Chọn tất cả"}
               </button>
             </div>
+            {/* 1b: danh sách HS đã chọn — bấm × để bỏ */}
+            {selectedIds.length > 0 && (
+              <div className="mb-2 flex max-h-[120px] flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-silver/20 bg-cream/40 p-2">
+                {selectedIds.map((id) => {
+                  const s = students.find((x) => x.id === id);
+                  return (
+                    <span key={id} className="inline-flex items-center gap-1 rounded-full bg-royal/8 px-2.5 py-0.5 text-[0.7rem] font-medium text-royal">
+                      {s?.fullName || id}
+                      <button type="button" onClick={() => toggleStudent(id)} className="leading-none text-royal/50 hover:text-red-500" title="Bỏ chọn">×</button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
             <div className="relative mb-2">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
               <input value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Tìm học viên..." className="input-field pl-9 !py-2 text-sm" />
