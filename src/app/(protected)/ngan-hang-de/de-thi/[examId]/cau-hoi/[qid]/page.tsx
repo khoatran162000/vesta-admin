@@ -83,7 +83,7 @@ export default function EditQuestionPage() {
     if (!file) return;
     const isAudio = file.type.startsWith("audio/");
     const formData = new FormData();
-    formData.append("thumbnail", file);
+    formData.append("image", file);
     try {
       const data = await api.post("/posts/upload-image", formData);
       if (data.success) { setMediaUrl(data.data.url); setMediaType(isAudio ? "audio" : "image"); }

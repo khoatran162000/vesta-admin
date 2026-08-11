@@ -49,7 +49,7 @@ export default function CreateQuestionPage() {
     const isImage = file.type.startsWith("image/");
     if (!isAudio && !isImage) { setError("Chỉ hỗ trợ file ảnh hoặc audio"); return; }
     const formData = new FormData();
-    formData.append("thumbnail", file);
+    formData.append("image", file);
     try {
       const data = await api.post("/posts/upload-image", formData);
       if (data.success) {
