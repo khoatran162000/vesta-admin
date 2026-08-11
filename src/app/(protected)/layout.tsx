@@ -44,6 +44,7 @@ const NAV: NavItem[] = [
     { href: "/sach", label: "Sách & Giáo trình", roles: ADMIN },
     { href: "/noi-dung-trang-chu", label: "Nội dung trang chủ", roles: CMS },
     { href: "/huong-dan-nhap-hoc", label: "Hướng dẫn nhập học", roles: CMS },
+    { href: "/huong-dan-buoi-dau", label: "Hướng dẫn buổi đầu", roles: CMS },
     { href: "/tai-lieu", label: "Tài liệu (bán)", roles: CMS },
     { href: "/don-hang", label: "Đơn hàng", roles: CMS, badgeKey: "orders" },
   ]},
