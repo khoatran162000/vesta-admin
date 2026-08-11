@@ -26,6 +26,7 @@ export default function SendNotificationPage() {
   const [classId, setClassId] = useState("");
   const [addingClass, setAddingClass] = useState(false);
   const [classNote, setClassNote] = useState("");
+  const [templates, setTemplates] = useState<any[]>([]);
 
   useEffect(() => {
     if (mode === "select") {
@@ -76,6 +77,25 @@ export default function SendNotificationPage() {
     setAddingClass(false);
   }
 
+  // 1a: mẫu thông báo
+  useEffect(() => {
+    api.get("/notifications/templates").then((r) => { if (r.success) setTemplates(r.data || []); }).catch(() => {});
+  }, []);
+  function applyTemplate(t: any) { setTitle(t.title || ""); setMessage(t.html || ""); }
+  async function persistTemplates(list: any[]) {
+    setTemplates(list);
+    try { await api.post("/notifications/templates", { templates: list }); } catch {}
+  }
+  function saveAsTemplate() {
+    const latestMsg = flushRef.current ? flushRef.current() : message;
+    const name = window.prompt("Tên mẫu:", title || "Mẫu mới");
+    if (!name) return;
+    persistTemplates([...templates, { id: Date.now().toString(), name, title, html: latestMsg }]);
+  }
+  function deleteTemplate(id: string) {
+    if (!window.confirm("Xoá mẫu này?")) return;
+    persistTemplates(templates.filter((x) => x.id !== id));
+  }
   const filteredStudents = students.filter((s) => {
     const q = searchInput.toLowerCase();
     return (s.fullName || "").toLowerCase().includes(q) ||
@@ -111,6 +131,20 @@ export default function SendNotificationPage() {
       </div>
       {error && <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
       <div className="card space-y-5">
+        {/* 1a: mẫu thông báo có sẵn */}
+        {templates.length > 0 && (
+          <div className="rounded-lg border border-gold/30 bg-gold/5 p-3">
+            <p className="mb-2 text-xs font-semibold text-royal">Mẫu có sẵn — bấm để dùng:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {templates.map((t) => (
+                <span key={t.id} className="inline-flex items-center gap-1 rounded-full border border-gold/40 bg-white px-2.5 py-1 text-xs text-royal">
+                  <button type="button" onClick={() => applyTemplate(t)} className="font-medium hover:text-gold-dark">{t.name}</button>
+                  <button type="button" onClick={() => deleteTemplate(t.id)} className="text-royal/40 hover:text-red-500" title="Xoá mẫu">×</button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         <div>
           <label className="mb-1 block text-sm font-medium text-royal">Tiêu đề *</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: Nhắc nhở làm bài tập" className="input-field" />
@@ -119,6 +153,7 @@ export default function SendNotificationPage() {
           <label className="mb-1 block text-sm font-medium text-royal">Nội dung *</label>
           <NotificationEditor value={message} onChange={setMessage} flushRef={flushRef} />
           <p className="mt-1 text-[0.7rem] text-muted">Soạn có thanh định dạng như blog, hoặc dán HTML ở tab Mã HTML rồi chỉnh chữ ở tab Soạn. Học viên sẽ thấy đúng định dạng này.</p>
+          <button type="button" onClick={saveAsTemplate} className="mt-2 text-xs font-medium text-gold hover:text-gold-dark">＋ Lưu nội dung này làm mẫu</button>
         </div>
 
         <div>
