@@ -62,6 +62,7 @@ export default function ClassContentPage() {
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
   const [previewItem, setPreviewItem] = useState<any>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const loadData = useCallback(async () => {
     setLoading(true);
     let path = "";
@@ -70,6 +71,7 @@ export default function ClassContentPage() {
     else path = `/class/feedback`;
     const json = await api.get(path);
     setData(json.data || []);
+    setSelectedIds(new Set());
     setLoading(false);
   }, [section, course]);
   useEffect(() => { loadData(); }, [loadData]);
@@ -97,6 +99,17 @@ export default function ClassContentPage() {
     if (!confirm("Xác nhận xoá?")) return;
     const url = section === "diary" ? `/class/diaries/${id}` : `/class/materials/${id}`;
     await api.delete(url);
+    loadData();
+  }
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+  async function bulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Xoá ${selectedIds.size} mục đã chọn? Không hoàn tác.`)) return;
+    const base = section === "diary" ? "/class/diaries" : "/class/materials";
+    for (const id of Array.from(selectedIds)) { try { await api.delete(`${base}/${id}`); } catch {} }
+    setSelectedIds(new Set());
     loadData();
   }
   return (
@@ -128,6 +141,13 @@ export default function ClassContentPage() {
           </button>
         )}
       </div>
+      {section !== "feedback" && selectedIds.size > 0 && (
+        <div className="mb-3 flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5">
+          <span className="text-sm font-semibold text-red-700">Đã chọn {selectedIds.size} mục</span>
+          <button onClick={bulkDelete} className="ml-auto inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700"><Trash2 size={14} />Xoá đã chọn</button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-muted hover:text-royal">Bỏ chọn</button>
+        </div>
+      )}
       <div className="overflow-hidden rounded-xl border border-silver/30 bg-white">
         {loading ? (
           <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-gold" /></div>
@@ -160,6 +180,7 @@ export default function ClassContentPage() {
         ) : section === "materials" ? (
           <table className="w-full text-left text-sm">
             <thead><tr className="border-b bg-cream">
+              <th className="w-10 px-4 py-3"><input type="checkbox" aria-label="Chọn tất cả" checked={data.length > 0 && selectedIds.size === data.length} onChange={(e) => setSelectedIds(e.target.checked ? new Set(data.map((x: any) => x.id)) : new Set())} /></th>
               <th className="px-4 py-3 font-semibold text-royal">#</th>
               <th className="px-4 py-3 font-semibold text-royal">Tên tài liệu</th>
               <th className="px-4 py-3 font-semibold text-royal">Loại</th>
@@ -169,6 +190,7 @@ export default function ClassContentPage() {
             <tbody>
               {data.map((m: any, i: number) => (
                 <tr key={m.id} className="border-b border-silver/10 hover:bg-cream/50">
+                  <td className="px-4 py-3"><input type="checkbox" checked={selectedIds.has(m.id)} onChange={() => toggleSelect(m.id)} /></td>
                   <td className="px-4 py-3 text-muted">{i + 1}</td>
                   <td className="px-4 py-3 font-medium text-[#1a1a2e]">{m.title}</td>
                   <td className="px-4 py-3"><span className="rounded bg-cream px-2 py-0.5 text-xs text-muted">{m.fileType || "FILE"}</span></td>
