@@ -1,7 +1,7 @@
 // FILE: src/app/(protected)/lop-hoc/page.tsx — Nội dung lớp học (3 tab)
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, Trash2, Save, Loader2, X, BookOpen, FileText, PenTool, ImagePlus, Eye } from "lucide-react";import { Plus, Trash2, Save, Loader2, X, BookOpen, FileText, PenTool, ImagePlus } from "lucide-react";
+import { Plus, Trash2, Save, Loader2, X, BookOpen, FileText, PenTool, ImagePlus, Eye } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLevels } from "@/lib/useLevels";
 import HtmlPasteBox from "@/components/HtmlPasteBox";
