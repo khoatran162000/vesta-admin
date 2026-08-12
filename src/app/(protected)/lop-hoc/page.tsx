@@ -1,10 +1,11 @@
 // FILE: src/app/(protected)/lop-hoc/page.tsx — Nội dung lớp học (3 tab)
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, Trash2, Save, Loader2, X, BookOpen, FileText, PenTool, ImagePlus } from "lucide-react";
+import { Plus, Trash2, Save, Loader2, X, BookOpen, FileText, PenTool, ImagePlus, Eye } from "lucide-react";import { Plus, Trash2, Save, Loader2, X, BookOpen, FileText, PenTool, ImagePlus } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLevels } from "@/lib/useLevels";
 import HtmlPasteBox from "@/components/HtmlPasteBox";
+import HtmlFrame from "@/components/HtmlFrame";
 type Section = "diary" | "materials" | "feedback";
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const API_BASE = (API_URL || "").replace(/\/api\/?$/, "");
@@ -60,6 +61,7 @@ export default function ClassContentPage() {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState<any>(null);
+  const [previewItem, setPreviewItem] = useState<any>(null);
   const loadData = useCallback(async () => {
     setLoading(true);
     let path = "";
@@ -148,7 +150,7 @@ export default function ClassContentPage() {
                   <td className="max-w-[300px] px-4 py-3"><p className="line-clamp-2 text-[#1a1a2e]">{d.topic}</p></td>
                   <td className="max-w-[200px] px-4 py-3 text-muted"><p className="line-clamp-1">{d.homework || "—"}</p></td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => { setEditItem(d); setShowModal(true); }} className="mr-1 rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><PenTool size={14} /></button>
+                    <button onClick={() => setPreviewItem(d)} title="Xem như học viên" className="mr-1 rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Eye size={14} /></button><button onClick={() => { setEditItem(d); setShowModal(true); }} className="mr-1 rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><PenTool size={14} /></button>
                     <button onClick={() => handleDelete(d.id)} className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
                   </td>
                 </tr>
@@ -221,6 +223,35 @@ export default function ClassContentPage() {
       </div>
       {showModal && (
         <Modal section={section} item={editItem} onClose={() => { setShowModal(false); setEditItem(null); }} onSave={handleSave} />
+      )}
+      {/* 2b: xem như HS */}
+      {previewItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy/50 px-4 py-8" onClick={() => setPreviewItem(null)}>
+          <div className="flex max-h-full w-full max-w-[760px] flex-col rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex shrink-0 items-center justify-between border-b border-silver/20 px-5 py-3">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-royal px-2.5 py-0.5 text-xs font-bold text-white">Buổi {previewItem.session}</span>
+                <span className="text-xs text-muted">{new Date(previewItem.date).toLocaleDateString("vi-VN")}</span>
+                <span className="rounded bg-cream-dark px-2 py-0.5 text-[0.65rem] text-muted">Xem như học viên</span>
+              </div>
+              <button onClick={() => setPreviewItem(null)} className="text-muted hover:text-royal"><X size={20} /></button>
+            </div>
+            <div className="overflow-auto p-5">
+              {previewItem.contentHtml
+                ? <div className="overflow-hidden rounded-lg border border-silver/20"><HtmlFrame html={previewItem.contentHtml} /></div>
+                : <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#1a1a2e]">{previewItem.topic}</p>}
+              {previewItem.homework && (
+                <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2">
+                  <p className="text-[0.65rem] font-bold uppercase tracking-wider text-amber-700">BTVN</p>
+                  <p className="text-xs text-amber-900">{previewItem.homework}</p>
+                </div>
+              )}
+              {previewItem.teacherNote && (
+                <div className="mt-2 rounded-lg bg-cream/60 px-3 py-2 text-xs italic text-muted">💬 {previewItem.teacherNote}</div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
