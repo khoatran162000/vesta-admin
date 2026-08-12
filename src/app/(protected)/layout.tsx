@@ -118,7 +118,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     const t = setInterval(loadVesta, 60000);
     return () => { alive = false; clearInterval(t); };
   }, [loading, user, pathname]);
-  function toggleMenu(label: string) {  function toggleMenu(label: string) {
+  function toggleMenu(label: string) {
     setOpenMenus((prev) => prev.includes(label) ? prev.filter((m) => m !== label) : [...prev, label]);
   }
   if (loading) {
