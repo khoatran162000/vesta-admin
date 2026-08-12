@@ -1,8 +1,8 @@
 // FILE: src/components/HtmlPasteBox.tsx
-// Ô dán HTML + Sửa trực tiếp + Xem trước (iframe cách ly). Dùng cho nhật ký / tài liệu / chấm bài.
+// Ô dán HTML + Sửa trực tiếp (có thanh định dạng) + Xem trước. Dùng cho nhật ký / tài liệu / chấm bài.
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Code, Eye, PencilLine, Save } from "lucide-react";
+import { Code, Eye, PencilLine, Save, Bold, Italic, Underline, List, ListOrdered, Link2, RemoveFormatting } from "lucide-react";
 import HtmlFrame from "./HtmlFrame";
 
 interface Props {
@@ -21,7 +21,6 @@ export default function HtmlPasteBox({ value, onChange, label, hint, rows = 8 }:
   const editRef = useRef<HTMLIFrameElement | null>(null);
   const loadedRef = useRef<string>("\u0000");
 
-  // Nạp value vào iframe khi vào tab "Sửa trực tiếp"
   useEffect(() => {
     if (tab !== "edit") return;
     const doc = editRef.current?.contentDocument;
@@ -61,7 +60,6 @@ export default function HtmlPasteBox({ value, onChange, label, hint, rows = 8 }:
     onChange(out);
     setDirty(false);
   }
-  // Rời tab Sửa trực tiếp → tự áp thay đổi để không mất
   function switchTab(next: Tab) {
     if (tab === "edit" && next !== "edit") {
       const out = readFrame();
@@ -69,12 +67,24 @@ export default function HtmlPasteBox({ value, onChange, label, hint, rows = 8 }:
     }
     setTab(next);
   }
+  // Định dạng trực tiếp (bôi đen chữ rồi bấm nút)
+  function exec(cmd: string, val?: string) {
+    const doc = editRef.current?.contentDocument;
+    if (!doc) return;
+    editRef.current?.contentWindow?.focus();
+    doc.execCommand(cmd, false, val);
+    setDirty(true);
+  }
 
   const TabBtn = ({ t, icon, text }: { t: Tab; icon: React.ReactNode; text: string }) => (
     <button type="button" onClick={() => switchTab(t)}
       className={`inline-flex items-center gap-1 rounded px-2 py-1 text-[0.7rem] font-semibold ${tab === t ? "bg-royal text-white" : "bg-cream text-muted hover:text-royal"}`}>
       {icon}{text}
     </button>
+  );
+  const FmtBtn = ({ title, onDo, children }: { title: string; onDo: () => void; children: React.ReactNode }) => (
+    <button type="button" title={title} onMouseDown={(e) => e.preventDefault()} onClick={onDo}
+      className="rounded p-1.5 text-muted hover:bg-cream hover:text-royal">{children}</button>
   );
 
   return (
@@ -94,8 +104,21 @@ export default function HtmlPasteBox({ value, onChange, label, hint, rows = 8 }:
           className="input-field font-mono text-xs" />
       ) : tab === "edit" ? (
         <div>
-          <div className="mb-1 flex items-center gap-2 rounded-lg border border-silver/30 bg-cream/40 p-2">
-            <span className="text-[0.7rem] text-muted">Bấm vào <b>chữ</b> rồi gõ đè. Chỉ sửa chữ/số — ảnh &amp; bố cục giữ nguyên. Đổi màu/thêm khối thì dùng <b>Mã HTML</b>.</span>
+          {/* Thanh định dạng */}
+          <div className="mb-1 flex flex-wrap items-center gap-1 rounded-lg border border-silver/30 bg-white p-1.5">
+            <FmtBtn title="Đậm" onDo={() => exec("bold")}><Bold size={14} /></FmtBtn>
+            <FmtBtn title="Nghiêng" onDo={() => exec("italic")}><Italic size={14} /></FmtBtn>
+            <FmtBtn title="Gạch chân" onDo={() => exec("underline")}><Underline size={14} /></FmtBtn>
+            <span className="mx-1 h-4 w-px bg-silver/30" />
+            <button type="button" title="Tiêu đề lớn" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("formatBlock", "H2")} className="rounded px-2 py-1 text-[0.7rem] font-bold text-muted hover:bg-cream hover:text-royal">H2</button>
+            <button type="button" title="Tiêu đề nhỏ" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("formatBlock", "H3")} className="rounded px-2 py-1 text-[0.7rem] font-bold text-muted hover:bg-cream hover:text-royal">H3</button>
+            <button type="button" title="Đoạn thường" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("formatBlock", "P")} className="rounded px-2 py-1 text-[0.7rem] font-medium text-muted hover:bg-cream hover:text-royal">P</button>
+            <span className="mx-1 h-4 w-px bg-silver/30" />
+            <FmtBtn title="Danh sách chấm" onDo={() => exec("insertUnorderedList")}><List size={14} /></FmtBtn>
+            <FmtBtn title="Danh sách số" onDo={() => exec("insertOrderedList")}><ListOrdered size={14} /></FmtBtn>
+            <FmtBtn title="Chèn link" onDo={() => { const url = window.prompt("Nhập link:"); if (url) exec("createLink", url); }}><Link2 size={14} /></FmtBtn>
+            <span className="mx-1 h-4 w-px bg-silver/30" />
+            <FmtBtn title="Xoá định dạng" onDo={() => exec("removeFormat")}><RemoveFormatting size={14} /></FmtBtn>
             <div className="ml-auto flex items-center gap-2">
               {dirty && <span className="text-[0.65rem] font-semibold text-amber-600">● chưa áp</span>}
               <button type="button" onClick={commitEdits} disabled={!dirty}
@@ -109,7 +132,7 @@ export default function HtmlPasteBox({ value, onChange, label, hint, rows = 8 }:
               ? <iframe ref={editRef} title="Sửa trực tiếp" sandbox="allow-same-origin" className="h-[50vh] w-full border-0 bg-white" />
               : <p className="py-10 text-center text-sm text-muted">Chưa có mã HTML. Dán ở tab <b>Mã HTML</b> trước.</p>}
           </div>
-          <p className="mt-1 text-[0.7rem] text-muted">Sửa xong bấm <b>Áp chỉnh sửa</b> (đổi tab cũng tự áp), rồi bấm <b>Lưu</b> ở dưới.</p>
+          <p className="mt-1 text-[0.7rem] text-muted">Bôi đen chữ rồi bấm nút định dạng. Sửa xong bấm <b>Áp chỉnh sửa</b> (đổi tab cũng tự áp), rồi <b>Lưu</b>.</p>
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-silver/40 bg-white">

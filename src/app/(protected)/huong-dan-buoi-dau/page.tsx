@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Save, Loader2, Eye, Code, PencilLine } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Eye, Code, PencilLine, Bold, Italic, Underline, List, ListOrdered, Link2, RemoveFormatting } from "lucide-react";
 import { api } from "@/lib/api";
 
 type Tab = "code" | "edit" | "preview";
@@ -67,6 +67,14 @@ export default function EditFirstDayGuidePage() {
     setHtml(out);
     setDirty(false);
     setMsg("Đã áp chỉnh sửa vào HTML — nhớ bấm Lưu.");
+  }
+  // Định dạng trực tiếp trên vùng đang sửa (bôi đen chữ rồi bấm nút)
+  function exec(cmd: string, val?: string) {
+    const doc = editRef.current?.contentDocument;
+    if (!doc) return;
+    editRef.current?.contentWindow?.focus();
+    doc.execCommand(cmd, false, val);
+    setDirty(true);
   }
 
   async function save() {
@@ -140,6 +148,22 @@ export default function EditFirstDayGuidePage() {
                 <Save size={13} />Áp chỉnh sửa
               </button>
             </div>
+          </div>
+          {/* Thanh định dạng cho Sửa trực tiếp */}
+          <div className="mb-2 flex flex-wrap items-center gap-1 rounded-lg border border-silver/30 bg-white p-1.5">
+            <button type="button" title="Đậm" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("bold")} className="rounded p-1.5 text-muted hover:bg-cream hover:text-royal"><Bold size={15} /></button>
+            <button type="button" title="Nghiêng" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("italic")} className="rounded p-1.5 text-muted hover:bg-cream hover:text-royal"><Italic size={15} /></button>
+            <button type="button" title="Gạch chân" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("underline")} className="rounded p-1.5 text-muted hover:bg-cream hover:text-royal"><Underline size={15} /></button>
+            <span className="mx-1 h-5 w-px bg-silver/30" />
+            <button type="button" title="Tiêu đề lớn" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("formatBlock", "H2")} className="rounded px-2 py-1 text-xs font-bold text-muted hover:bg-cream hover:text-royal">H2</button>
+            <button type="button" title="Tiêu đề nhỏ" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("formatBlock", "H3")} className="rounded px-2 py-1 text-xs font-bold text-muted hover:bg-cream hover:text-royal">H3</button>
+            <button type="button" title="Đoạn thường" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("formatBlock", "P")} className="rounded px-2 py-1 text-xs font-medium text-muted hover:bg-cream hover:text-royal">P</button>
+            <span className="mx-1 h-5 w-px bg-silver/30" />
+            <button type="button" title="Danh sách chấm" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("insertUnorderedList")} className="rounded p-1.5 text-muted hover:bg-cream hover:text-royal"><List size={15} /></button>
+            <button type="button" title="Danh sách số" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("insertOrderedList")} className="rounded p-1.5 text-muted hover:bg-cream hover:text-royal"><ListOrdered size={15} /></button>
+            <button type="button" title="Chèn link" onMouseDown={(e) => e.preventDefault()} onClick={() => { const url = window.prompt("Nhập link:"); if (url) exec("createLink", url); }} className="rounded p-1.5 text-muted hover:bg-cream hover:text-royal"><Link2 size={15} /></button>
+            <span className="mx-1 h-5 w-px bg-silver/30" />
+            <button type="button" title="Xoá định dạng" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("removeFormat")} className="rounded p-1.5 text-muted hover:bg-cream hover:text-royal"><RemoveFormatting size={15} /></button>
           </div>
           <div className="overflow-hidden rounded-lg border-2 border-dashed border-royal/30">
             {html.trim()
