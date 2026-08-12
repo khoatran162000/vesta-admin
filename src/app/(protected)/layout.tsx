@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, BookOpen, GraduationCap, Bell, UserCircle,
-  LogOut, ChevronDown, Calendar, FileText, Target, BarChart3, ShieldAlert, MessageSquare, Menu, X
+  LogOut, ChevronDown, Calendar, FileText, Target, BarChart3, ShieldAlert, MessageSquare, Heart, Menu, XShieldAlert, MessageSquare, Menu, X
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth, ROLE_LABELS } from "@/hooks/useAuth";
@@ -56,6 +56,7 @@ const NAV: NavItem[] = [
     { href: "/bao-cao/cuoi-khoa", label: "Báo cáo cuối khóa" },
   ] },
   { href: "/tu-van", label: "Yêu cầu tư vấn", icon: MessageSquare, roles: ADMIN, badgeKey: "consultation" },
+  { href: "/tam-su", label: "Tâm sự với Vesta", icon: Heart, roles: STAFF, badgeKey: "vesta" },
   { href: "/thong-bao", label: "Thông báo", icon: Bell, roles: STAFF },
   { href: "/ho-so", label: "Hồ sơ", icon: UserCircle },
 ];
@@ -66,6 +67,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const [openMenus, setOpenMenus] = useState<string[]>([]);
   const [consultCount, setConsultCount] = useState(0);
   const [orderCount, setOrderCount] = useState(0);
+  const [vestaCount, setVestaCount] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);  // sidebar mobile
   useEffect(() => {
     if (!loading && !user) router.replace("/dang-nhap");
@@ -101,7 +103,22 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     const t = setInterval(loadOrderCount, 60000);
     return () => { alive = false; clearInterval(t); };
   }, [loading, user, pathname]);
-  function toggleMenu(label: string) {
+  // Đếm tin Tâm sự MỚI (ADMIN + TEACHER) — poll 60s
+  useEffect(() => {
+    const canV = user?.role === "ADMIN" || user?.role === "TEACHER";
+    if (loading || !canV) return;
+    let alive = true;
+    async function loadVesta() {
+      try {
+        const res = await api.get("/vesta-messages/count-new");
+        if (alive && res.success) setVestaCount(res.count || 0);
+      } catch {}
+    }
+    loadVesta();
+    const t = setInterval(loadVesta, 60000);
+    return () => { alive = false; clearInterval(t); };
+  }, [loading, user, pathname]);
+  function toggleMenu(label: string) {  function toggleMenu(label: string) {
     setOpenMenus((prev) => prev.includes(label) ? prev.filter((m) => m !== label) : [...prev, label]);
   }
   if (loading) {
@@ -123,7 +140,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     })
     .filter((item) => "href" in item || (item as NavGroup).children.length > 0);
   // Số badge theo key
-  const badgeFor = (key?: string) => (key === "consultation" ? consultCount : key === "orders" ? orderCount : 0);
+  const badgeFor = (key?: string) => (key === "consultation" ? consultCount : key === "orders" ? orderCount : key === "vesta" ? vestaCount : 0);  const badgeFor = (key?: string) => (key === "consultation" ? consultCount : key === "orders" ? orderCount : 0);
 
   // Nội dung sidebar (dùng chung cho bản desktop cố định + drawer mobile)
   const sidebarInner = (
