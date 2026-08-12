@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, BookOpen, GraduationCap, Bell, UserCircle,
-  LogOut, ChevronDown, Calendar, FileText, Target, BarChart3, ShieldAlert, MessageSquare, Heart, Menu, XShieldAlert, MessageSquare, Menu, X
+  LogOut, ChevronDown, Calendar, FileText, Target, BarChart3, ShieldAlert, MessageSquare, Heart, Menu, X
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth, ROLE_LABELS } from "@/hooks/useAuth";
@@ -140,7 +140,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     })
     .filter((item) => "href" in item || (item as NavGroup).children.length > 0);
   // Số badge theo key
-  const badgeFor = (key?: string) => (key === "consultation" ? consultCount : key === "orders" ? orderCount : key === "vesta" ? vestaCount : 0);  const badgeFor = (key?: string) => (key === "consultation" ? consultCount : key === "orders" ? orderCount : 0);
+  const badgeFor = (key?: string) => (key === "consultation" ? consultCount : key === "orders" ? orderCount : key === "vesta" ? vestaCount : 0);
 
   // Nội dung sidebar (dùng chung cho bản desktop cố định + drawer mobile)
   const sidebarInner = (
