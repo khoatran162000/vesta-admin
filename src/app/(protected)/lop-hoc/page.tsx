@@ -63,6 +63,7 @@ export default function ClassContentPage() {
   const [editItem, setEditItem] = useState<any>(null);
   const [previewItem, setPreviewItem] = useState<any>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [classes, setClasses] = useState<any[]>([]);
   const loadData = useCallback(async () => {
     setLoading(true);
     let path = "";
@@ -75,6 +76,10 @@ export default function ClassContentPage() {
     setLoading(false);
   }, [section, course]);
   useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    if (section !== "diary") return;
+    api.get(`/classes?course=${encodeURIComponent(course)}`).then((r) => { if (r.success) setClasses(r.data || []); }).catch(() => {});
+  }, [section, course]);
   async function handleSave(formData: any) {
     let url = "", method: "post" | "put" = "post";
     if (section === "diary") {
@@ -167,7 +172,18 @@ export default function ClassContentPage() {
                 <tr key={d.id} className="border-b border-silver/10 hover:bg-cream/50">
                   <td className="px-4 py-3 font-bold text-royal">{d.session}</td>
                   <td className="px-4 py-3 text-muted">{new Date(d.date).toLocaleDateString("vi-VN")}</td>
-                  <td className="max-w-[300px] px-4 py-3"><p className="line-clamp-2 text-[#1a1a2e]">{d.topic}</p></td>
+                  <td className="max-w-[300px] px-4 py-3">
+                    <p className="line-clamp-2 text-[#1a1a2e]">{d.topic}</p>
+                    {Array.isArray(d.classIds) && d.classIds.length > 0 ? (
+                      <span className="mt-0.5 flex flex-wrap gap-1">
+                        {d.classIds.map((cid: string) => (
+                          <span key={cid} className="rounded bg-royal/8 px-1.5 py-0.5 text-[0.6rem] font-semibold text-royal">{classes.find((c) => c.id === cid)?.classCode || classes.find((c) => c.id === cid)?.name || "Lớp"}</span>
+                        ))}
+                      </span>
+                    ) : (
+                      <span className="mt-0.5 inline-block rounded bg-cream-dark px-1.5 py-0.5 text-[0.6rem] text-muted">Cả khoá</span>
+                    )}
+                  </td>
                   <td className="max-w-[200px] px-4 py-3 text-muted"><p className="line-clamp-1">{d.homework || "—"}</p></td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => setPreviewItem(d)} title="Xem như học viên" className="mr-1 rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Eye size={14} /></button><button onClick={() => { setEditItem({ ...d, id: undefined, session: "" }); setShowModal(true); }} title="Nhân bản (copy format)" className="mr-1 rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Copy size={14} /></button><button onClick={() => { setEditItem(d); setShowModal(true); }} className="mr-1 rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><PenTool size={14} /></button>
@@ -244,7 +260,7 @@ export default function ClassContentPage() {
         )}
       </div>
       {showModal && (
-        <Modal section={section} item={editItem} onClose={() => { setShowModal(false); setEditItem(null); }} onSave={handleSave} />
+        <Modal section={section} item={editItem} classes={classes} onClose={() => { setShowModal(false); setEditItem(null); }} onSave={handleSave} />
       )}
       {/* 2b: xem như HS */}
       {previewItem && (
@@ -319,7 +335,7 @@ function ImageUploadBox({ label, value, onChange, hint }: { label: string; value
     </div>
   );
 }
-function Modal({ section, item, onClose, onSave }: { section: Section; item: any; onClose: () => void; onSave: (d: any) => void }) {
+function Modal({ section, item, classes, onClose, onSave }: { section: Section; item: any; classes: any[]; onClose: () => void; onSave: (d: any) => void }) {
   const [form, setForm] = useState<any>(item || {});
   const [saving, setSaving] = useState(false);
   const [diaryMode, setDiaryMode] = useState<"form" | "html" | "image">(isImageHtml(item?.contentHtml) ? "image" : item?.contentHtml ? "html" : "form");
@@ -387,6 +403,29 @@ function Modal({ section, item, onClose, onSave }: { section: Section; item: any
                 <label className="mb-1 block text-xs font-bold text-muted">Ngày</label>
                 <input type="date" value={form.date?.slice?.(0, 10) || ""} onChange={(e) => set("date", e.target.value)} className="input-field" />
               </div>
+            </div>
+            {/* Áp dụng cho lớp — trống = cả khoá */}
+            <div>
+              <label className="mb-1 block text-xs font-bold text-muted">Áp dụng cho lớp <span className="font-normal text-muted">(để trống = cả khoá)</span></label>
+              {classes.length === 0 ? (
+                <p className="text-xs text-muted">Khoá này chưa có lớp — buổi sẽ áp cho cả khoá.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {classes.map((c) => {
+                    const on = Array.isArray(form.classIds) && form.classIds.includes(c.id);
+                    return (
+                      <button type="button" key={c.id}
+                        onClick={() => { const cur: string[] = Array.isArray(form.classIds) ? form.classIds : []; set("classIds", on ? cur.filter((x: string) => x !== c.id) : [...cur, c.id]); }}
+                        className={`rounded-full border px-3 py-1 text-xs font-medium ${on ? "border-gold bg-gold/10 text-royal" : "border-silver/40 text-muted hover:border-gold/40"}`}>
+                        {c.classCode || c.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {Array.isArray(form.classIds) && form.classIds.length > 0 && (
+                <p className="mt-1 text-[0.7rem] text-gold-dark">Chỉ HS {form.classIds.length} lớp đã chọn thấy buổi này.</p>
+              )}
             </div>
             {diaryMode === "form" ? (<>
               <div>
