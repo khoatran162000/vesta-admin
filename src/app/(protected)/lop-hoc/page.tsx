@@ -1,7 +1,7 @@
 // FILE: src/app/(protected)/lop-hoc/page.tsx — Nội dung lớp học (3 tab)
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, Trash2, Save, Loader2, X, BookOpen, FileText, PenTool, ImagePlus, Eye } from "lucide-react";
+import { Plus, Trash2, Save, Loader2, X, BookOpen, FileText, PenTool, ImagePlus, Eye, Copy } from "lucide-react";
 import { api } from "@/lib/api";
 import { useLevels } from "@/lib/useLevels";
 import HtmlPasteBox from "@/components/HtmlPasteBox";
@@ -170,7 +170,7 @@ export default function ClassContentPage() {
                   <td className="max-w-[300px] px-4 py-3"><p className="line-clamp-2 text-[#1a1a2e]">{d.topic}</p></td>
                   <td className="max-w-[200px] px-4 py-3 text-muted"><p className="line-clamp-1">{d.homework || "—"}</p></td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => setPreviewItem(d)} title="Xem như học viên" className="mr-1 rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Eye size={14} /></button><button onClick={() => { setEditItem(d); setShowModal(true); }} className="mr-1 rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><PenTool size={14} /></button>
+                    <button onClick={() => setPreviewItem(d)} title="Xem như học viên" className="mr-1 rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Eye size={14} /></button><button onClick={() => { setEditItem({ ...d, id: undefined, session: "" }); setShowModal(true); }} title="Nhân bản (copy format)" className="mr-1 rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Copy size={14} /></button><button onClick={() => { setEditItem(d); setShowModal(true); }} className="mr-1 rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><PenTool size={14} /></button>
                     <button onClick={() => handleDelete(d.id)} className="rounded p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
                   </td>
                 </tr>
