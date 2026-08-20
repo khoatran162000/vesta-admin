@@ -131,6 +131,70 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     try { document.execCommand(command, false, value); } catch {}
     emit();
   }
+  // ── Thao tác BẢNG (chèn/xoá hàng-cột, chia cột đều) trên ô đang đặt con trỏ ──
+  function restoreCursor() {
+    hostRef.current?.focus();
+    const r = savedRange.current;
+    if (r) { const sel = window.getSelection(); sel?.removeAllRanges(); sel?.addRange(r); }
+  }
+  function currentCell(): HTMLTableCellElement | null {
+    let node: Node | null = savedRange.current?.startContainer || window.getSelection()?.anchorNode || null;
+    while (node && node !== hostRef.current) {
+      const tag = (node as HTMLElement).tagName;
+      if (tag === "TD" || tag === "TH") return node as HTMLTableCellElement;
+      node = node.parentNode;
+    }
+    return null;
+  }
+  function insertTable() {
+    restoreCursor();
+    pushUndo();
+    const cellStyle = "border:1px solid #999;padding:6px;min-width:40px";
+    let html = '<table style="border-collapse:collapse;width:100%"><tbody>';
+    for (let r = 0; r < 2; r++) {
+      html += "<tr>";
+      for (let c = 0; c < 2; c++) html += `<td style="${cellStyle}">&nbsp;</td>`;
+      html += "</tr>";
+    }
+    html += "</tbody></table><p><br></p>";
+    document.execCommand("insertHTML", false, html);
+    emit();
+  }
+  function tableOp(action: string) {
+    const cell = currentCell();
+    if (!cell) { alert("Đặt con trỏ vào một ô trong bảng trước đã."); return; }
+    const row = cell.parentElement as HTMLTableRowElement;
+    const table = cell.closest("table") as HTMLTableElement | null;
+    if (!row || !table) return;
+    const idx = cell.cellIndex;
+    pushUndo();
+    if (action === "rowBelow" || action === "rowAbove") {
+      const nr = row.cloneNode(true) as HTMLTableRowElement;
+      Array.from(nr.cells).forEach((c) => { c.innerHTML = "&nbsp;"; });
+      row.parentElement!.insertBefore(nr, action === "rowBelow" ? row.nextSibling : row);
+    } else if (action === "delRow") {
+      if (row.parentElement && row.parentElement.children.length > 1) row.remove();
+      else alert("Bảng cần ít nhất 1 hàng.");
+    } else if (action === "colRight" || action === "colLeft") {
+      Array.from(table.rows).forEach((tr) => {
+        const ref = tr.cells[idx];
+        const at = action === "colRight" ? idx + 1 : idx;
+        const nc = tr.insertCell(Math.min(at, tr.cells.length));
+        nc.innerHTML = "&nbsp;";
+        nc.setAttribute("style", ref?.getAttribute("style") || "border:1px solid #999;padding:6px;min-width:40px");
+      });
+    } else if (action === "delCol") {
+      if ((table.rows[0]?.cells.length || 0) > 1) {
+        Array.from(table.rows).forEach((tr) => { if (tr.cells[idx]) tr.deleteCell(idx); });
+      } else alert("Bảng cần ít nhất 1 cột.");
+    } else if (action === "even") {
+      const n = table.rows[0]?.cells.length || 1;
+      table.style.tableLayout = "fixed";
+      table.style.width = "100%";
+      Array.from(table.rows).forEach((tr) => Array.from(tr.cells).forEach((c) => { c.style.width = `${(100 / n).toFixed(2)}%`; }));
+    }
+    emit();
+  }
   function applyFontSize(px: string) {
     const host = hostRef.current;
     if (!host || !px) return;
@@ -584,6 +648,18 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
           <button type="button" title="Danh sách số" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("insertOrderedList")} className={fmtBtn}><ListOrdered size={15} /></button>
           <span className="mx-0.5 h-5 w-px bg-gray-300" />
           <button type="button" title="Xoá định dạng" onMouseDown={(e) => e.preventDefault()} onClick={() => exec("removeFormat")} className={fmtBtn}><RemoveFormatting size={15} /></button>
+        </div>
+        {/* Thanh BẢNG */}
+        <div className="mb-2 flex flex-wrap items-center gap-1 rounded-lg border border-gray-200 bg-white p-1.5">
+          <span className="mr-1 text-xs font-medium text-gray-500">Bảng:</span>
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={insertTable} className="rounded bg-slate-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-slate-700">+ Chèn bảng</button>
+          <span className="mx-1 h-4 w-px bg-gray-300" />
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => tableOp("rowBelow")} className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100" title="Thêm hàng bên dưới">+ Hàng</button>
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => tableOp("delRow")} className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100" title="Xoá hàng hiện tại">− Hàng</button>
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => tableOp("colRight")} className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100" title="Thêm cột bên phải">+ Cột</button>
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => tableOp("delCol")} className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100" title="Xoá cột hiện tại">− Cột</button>
+          <span className="mx-1 h-4 w-px bg-gray-300" />
+          <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => tableOp("even")} className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100" title="Chia các cột rộng đều nhau">Chia cột đều</button>
         </div>
       </div>
       {/* Vùng soạn */}
