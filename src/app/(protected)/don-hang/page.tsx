@@ -3,13 +3,14 @@
 import { useState, useEffect, useRef } from "react";
 import { Loader2, X, Upload, Check, Package, FileText, ExternalLink } from "lucide-react";
 import { api } from "@/lib/api";
+import HtmlPasteBox from "@/components/HtmlPasteBox";
 
 interface Order {
   id: string; code: string; kind: string; status: string;
   customerName: string; customerEmail: string; customerPhone: string | null;
   itemId: string | null; item?: { title: string } | null;
   gradingType: string | null; essayText: string | null; speakingLink: string | null;
-  amount: number; deliverUrl: string | null; adminNote: string | null; createdAt: string;
+  amount: number; deliverUrl: string | null; resultHtml: string | null; adminNote: string | null; createdAt: string;
 }
 const fmtVND = (n: number) => n.toLocaleString("vi-VN") + "₫";
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -80,6 +81,7 @@ function OrderDetail({ order, close, saved }: { order: Order; close: () => void;
   const [amount, setAmount] = useState(String(order.amount || ""));
   const [adminNote, setAdminNote] = useState(order.adminNote || "");
   const [file, setFile] = useState<File | null>(null);
+  const [resultHtml, setResultHtml] = useState(order.resultHtml || "");
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -88,10 +90,10 @@ function OrderDetail({ order, close, saved }: { order: Order; close: () => void;
     let body: any;
     if (withFile && file) {
       body = new FormData();
-      Object.entries({ ...extra, amount, adminNote }).forEach(([k, v]) => body.append(k, String(v)));
+      Object.entries({ ...extra, amount, adminNote, resultHtml }).forEach(([k, v]) => body.append(k, String(v)));
       body.append("file", file);
     } else {
-      body = { ...extra, amount: Number(amount) || 0, adminNote };
+      body = { ...extra, amount: Number(amount) || 0, adminNote, resultHtml };
     }
     const res = await api.patch(`/orders/${order.id}`, body);
     setSaving(false);
@@ -137,12 +139,21 @@ function OrderDetail({ order, close, saved }: { order: Order; close: () => void;
             <Upload size={16} />{file ? file.name : order.deliverUrl ? "Đã có file giao — chọn để thay" : "Chọn file giao"}
           </button>
         </label>
+        <div className="mb-4">
+          <HtmlPasteBox
+            label="Bài chữa dạng text/HTML (tuỳ chọn — HS đọc ngay trên web)"
+            value={resultHtml}
+            onChange={setResultHtml}
+            hint="Soạn nhận xét / bài đã chữa. Dùng kèm hoặc thay cho file. HS xem ở trang Tra cứu đơn khi đơn đã giao."
+            rows={6}
+          />
+        </div>
 
         <div className="flex flex-wrap justify-end gap-2">
           <button onClick={() => patch({})} disabled={saving} className="btn-secondary">Lưu ghi chú/giá</button>
           {order.status === "PENDING" && <button onClick={() => patch({ status: "PAID" })} disabled={saving} className="btn-primary"><Check size={15} />Đã nhận tiền</button>}
           {(order.status === "PAID" || order.status === "PENDING") && (
-            <button onClick={() => patch({ status: "DELIVERED" }, true)} disabled={saving || (!file && !order.deliverUrl)} className="btn-primary bg-green-600 hover:bg-green-700">
+            <button onClick={() => patch({ status: "DELIVERED" }, true)} disabled={saving || (!file && !order.deliverUrl && !resultHtml.trim())} className="btn-primary bg-green-600 hover:bg-green-700">
               <Package size={15} />Giao hàng
             </button>
           )}
