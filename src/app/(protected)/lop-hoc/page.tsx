@@ -78,7 +78,7 @@ export default function ClassContentPage() {
   useEffect(() => { loadData(); }, [loadData]);
   useEffect(() => {
     if (section !== "diary") return;
-    api.get(`/classes?course=${encodeURIComponent(course)}`).then((r) => { if (r.success) setClasses(r.data || []); }).catch(() => {});
+    api.get(`/classes`).then((r) => { if (r.success) setClasses(r.data || []); }).catch(() => {}); // hiện tất cả lớp để chọn
   }, [section, course]);
   async function handleSave(formData: any) {
     let url = "", method: "post" | "put" = "post";
