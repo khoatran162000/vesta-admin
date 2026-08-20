@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Pencil, Trash2, Search, Loader2, Eye } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Loader2, Eye, Copy } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { canEditContent } from "@/lib/permissions";
@@ -38,6 +38,10 @@ export default function ExamListPage() {
     const data = await api.delete(`/exams/${id}`);
     if (data.success) { setDeleteId(null); fetchExams(); } else { alert(data.message); setDeleteId(null); }
   }
+  async function handleDuplicate(id: string) {
+    const data = await api.post(`/exams/${id}/duplicate`, {});
+    if (data.success) fetchExams(); else alert(data.message || "Lỗi nhân bản");
+  }
 
   return (
     <div className="mx-auto max-w-[1100px]">
@@ -61,6 +65,7 @@ export default function ExamListPage() {
                   <Link href={`/ngan-hang-de/de-thi/${exam.id}/cau-hoi`} title="Xem câu hỏi" className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Eye size={15} /></Link>
                   {canEdit && (<>
                     <Link href={`/ngan-hang-de/de-thi/${exam.id}`} title="Sửa" className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Pencil size={15} /></Link>
+                    <button onClick={() => handleDuplicate(exam.id)} title="Nhân bản" className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Copy size={15} /></button>
                     <button onClick={() => setDeleteId(exam.id)} title="Xoá" className="rounded-lg p-1.5 text-muted hover:bg-red-50 hover:text-red-600"><Trash2 size={15} /></button>
                   </>)}
                 </div></td>
