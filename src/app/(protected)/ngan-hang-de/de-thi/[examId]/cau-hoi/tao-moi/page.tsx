@@ -101,7 +101,7 @@ export default function CreateQuestionPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[800px]">
+    <div className="mx-auto max-w-[1100px]">
       <div className="mb-6 flex items-center gap-3">
         <Link href={`/ngan-hang-de/de-thi/${examId}/cau-hoi`} className="rounded-lg p-2 text-muted hover:bg-cream-dark hover:text-royal"><ArrowLeft size={20} /></Link>
         <h2 className="font-display text-2xl font-bold text-royal">Thêm câu hỏi</h2>

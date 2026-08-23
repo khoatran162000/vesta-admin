@@ -125,7 +125,7 @@ export default function EditQuestionPage() {
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 size={24} className="animate-spin text-gold" /></div>;
   return (
-    <div className="mx-auto max-w-[800px]">
+    <div className="mx-auto max-w-[1100px]">
       <div className="mb-6 flex items-center gap-3">
         <Link href={`/ngan-hang-de/de-thi/${examId}/cau-hoi`} className="rounded-lg p-2 text-muted hover:bg-cream-dark hover:text-royal"><ArrowLeft size={20} /></Link>
         <h2 className="font-display text-2xl font-bold text-royal">Sửa câu hỏi</h2>
