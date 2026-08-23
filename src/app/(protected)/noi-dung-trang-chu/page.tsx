@@ -1,7 +1,7 @@
 // FILE: src/app/(protected)/noi-dung-trang-chu/page.tsx — Hub nội dung tĩnh landing
 "use client";
 import Link from "next/link";
-import { LayoutTemplate, ScrollText, Wallet, BookMarked, ChevronRight, ImagePlus } from "lucide-react";
+import { LayoutTemplate, ScrollText, Wallet, BookMarked, ChevronRight, ImagePlus, CalendarDays } from "lucide-react";
 
 const BLOCKS = [
   { key: "hero", label: "Hero (banner đầu trang)", desc: "Tiêu đề lớn + slogan", icon: LayoutTemplate },
@@ -9,6 +9,7 @@ const BLOCKS = [
   { key: "tuition", label: "Thông tin học phí", desc: "Các ghi chú học phí + thông tin ngân hàng + QR", icon: Wallet },
   { key: "books_spark", label: "Mô tả SPARK (mục Sách)", desc: "Đoạn giới thiệu bộ SPARK", icon: BookMarked },
   { key: "logo", label: "Logo & Favicon", desc: "Logo trang + favicon (icon tab trình duyệt)", icon: ImagePlus },
+  { key: "calendar_html", label: "Lịch làm bài (dán HTML cả năm)", desc: "Dán nguyên trang HTML lịch — HS xem trực tiếp", icon: CalendarDays },
 ];
 
 export default function SiteContentHubPage() {
