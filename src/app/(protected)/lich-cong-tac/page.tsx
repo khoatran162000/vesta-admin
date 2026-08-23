@@ -82,6 +82,13 @@ export default function LichCongTacPage() {
   // Mobile: ngày đang chọn (mặc định hôm nay nếu trong tuần, không thì T2)
   const [mDay, setMDay] = useState(0);
   const exportRef = useRef<HTMLDivElement>(null);
+  const [workHtml, setWorkHtml] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    (async () => {
+      try { const r = await api.get("/site-content/schedule_work_html"); setWorkHtml(r?.data?.data?.html || null); }
+      catch { setWorkHtml(null); }
+    })();
+  }, []);
 
   const load = async () => {
     setLoading(true);
@@ -143,6 +150,11 @@ export default function LichCongTacPage() {
     rooms: ROOMS.map((room) => schedule.find((v) => v.dayIndex === day && v.slot === slot.id && v.room === room)).filter(Boolean) as S[],
   })).filter((g) => g.rooms.length > 0);
 
+  if (workHtml) return (
+    <div className="h-[calc(100vh-7rem)] w-full overflow-hidden rounded-lg border border-gray-200">
+      <iframe title="lich-cong-tac" srcDoc={workHtml} sandbox="allow-scripts allow-popups" className="h-full w-full border-0" />
+    </div>
+  );
   return (
     <div className="mx-auto max-w-[1600px]">
       {/* Thanh điều khiển */}

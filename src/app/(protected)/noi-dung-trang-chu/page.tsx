@@ -10,6 +10,8 @@ const BLOCKS = [
   { key: "books_spark", label: "Mô tả SPARK (mục Sách)", desc: "Đoạn giới thiệu bộ SPARK", icon: BookMarked },
   { key: "logo", label: "Logo & Favicon", desc: "Logo trang + favicon (icon tab trình duyệt)", icon: ImagePlus },
   { key: "calendar_html", label: "Lịch làm bài (dán HTML cả năm)", desc: "Dán nguyên trang HTML lịch — HS xem trực tiếp", icon: CalendarDays },
+  { key: "schedule_work_html", label: "Lịch công tác (dán HTML)", desc: "Dán trang HTML lịch công tác — nhân sự xem view tháng", icon: CalendarDays },
+  { key: "schedule_personal_html", label: "Lịch cá nhân (dán HTML)", desc: "Dán trang HTML lịch cá nhân của chị", icon: CalendarDays },
 ];
 
 export default function SiteContentHubPage() {

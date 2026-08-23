@@ -30,6 +30,7 @@ const NAV: NavItem[] = [
     { href: "/lop-hoc", label: "Nội dung lớp" },
     { href: "/lich-hoc", label: "Lịch học cả năm" },
     { href: "/lich-cong-tac", label: "Lịch công tác" },
+    { href: "/lich-ca-nhan", label: "Lịch cá nhân" },
     { href: "/trinh-do", label: "Trình độ", roles: ADMIN },
   ]},
   { label: "Ngân hàng đề", icon: BookOpen, roles: STAFF, children: [

@@ -9,6 +9,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 function getToken() { return localStorage.getItem("accessToken") || ""; }
 const LABELS: Record<string, string> = {
   calendar_html: "Lịch làm bài (HTML)",
+  schedule_work_html: "Lịch công tác (HTML)",
+  schedule_personal_html: "Lịch cá nhân (HTML)",
   hero: "Hero (banner đầu trang)",
   philosophy: "Phong cách dạy & Nội quy",
   tuition: "Thông tin học phí",
@@ -118,9 +120,9 @@ export default function EditSiteContentPage() {
       </div>
       {error && <p className="mb-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
       {/* ===== HERO ===== */}
-      {key === "calendar_html" && (
+      {(key === "calendar_html" || key === "schedule_work_html" || key === "schedule_personal_html") && (
         <div>
-          <label className="mb-1 block text-sm font-medium text-[#1a1a2e]">Dán nguyên mã HTML trang lịch cả năm</label>
+          <label className="mb-1 block text-sm font-medium text-[#1a1a2e]">Dán nguyên mã HTML của trang lịch</label>
           <textarea value={data.html || ""} onChange={(e) => setData({ ...data, html: e.target.value })} rows={20} className="input-field resize-none font-mono text-xs" placeholder="<!doctype html> ..." />
           <p className="mt-1 text-xs text-muted">HS sẽ xem trực tiếp trang này ở mục Lịch làm bài. Dán đè để cập nhật cả năm / đổi ngày khai giảng. (File nặng vẫn lưu được.)</p>
         </div>
