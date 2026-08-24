@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, Trash2, Download, Loader2, X, Check, Copy, Calendar as CalIcon } from "lucide-react";
 import { api } from "@/lib/api";
+import EditableHtmlCalendar from "@/components/EditableHtmlCalendar";
 import { useAuth } from "@/hooks/useAuth";
 
 type S = { id: string; weekStart: string; dayIndex: number; slot: string; room: string; className: string; teacher: string; assistant: string; tags: string; note: string };
@@ -150,11 +151,7 @@ export default function LichCongTacPage() {
     rooms: ROOMS.map((room) => schedule.find((v) => v.dayIndex === day && v.slot === slot.id && v.room === room)).filter(Boolean) as S[],
   })).filter((g) => g.rooms.length > 0);
 
-  if (workHtml) return (
-    <div className="h-[calc(100vh-7rem)] w-full overflow-hidden rounded-lg border border-gray-200">
-      <iframe title="lich-cong-tac" srcDoc={workHtml} sandbox="allow-scripts allow-popups" className="h-full w-full border-0" />
-    </div>
-  );
+  if (workHtml) return <EditableHtmlCalendar initialTemplate={workHtml} dataEndpoint="/work-calendar" />;
   return (
     <div className="mx-auto max-w-[1600px]">
       {/* Thanh điều khiển */}
