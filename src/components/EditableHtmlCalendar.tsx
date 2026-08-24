@@ -1,7 +1,7 @@
-// FILE: src/components/EditableHtmlCalendar.tsx — Lịch HTML dán vào: gõ trực tiếp + tự lưu server + in PDF
+// FILE: src/components/EditableHtmlCalendar.tsx — Lịch HTML dán vào: gõ trực tiếp + tự lưu server + in PDF + làm mới
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Save, Check } from "lucide-react";
+import { Loader2, Save, Check, RotateCcw } from "lucide-react";
 import { api } from "@/lib/api";
 
 // Chèn "cầu nối": thay localStorage bằng bản đồng bộ về server (iframe vẫn cách ly)
@@ -30,8 +30,8 @@ function injectShim(template: string, store: Record<string, string>) {
 
 type Props = {
   dataEndpoint: string;        // "/personal-calendar" | "/work-calendar"
-  templateKey?: string;        // site-content key để tải mẫu HTML
-  initialTemplate?: string;    // hoặc truyền thẳng mẫu HTML
+  templateKey?: string;
+  initialTemplate?: string;
   emptyHint?: string;
 };
 
@@ -39,7 +39,9 @@ export default function EditableHtmlCalendar({ dataEndpoint, templateKey, initia
   const [tpl, setTpl] = useState<string | null | undefined>(undefined);
   const [srcDoc, setSrcDoc] = useState<string>("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const [nonce, setNonce] = useState(0); // đổi để buộc iframe nạp lại
   const storeRef = useRef<Record<string, string>>({});
+  const tplRef = useRef<string>("");
   const timerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -53,6 +55,7 @@ export default function EditableHtmlCalendar({ dataEndpoint, templateKey, initia
         const dataRes = await api.get(dataEndpoint).catch(() => null);
         const store = (dataRes as any)?.data?.store || {};
         storeRef.current = store;
+        tplRef.current = template;
         setTpl(template || null);
         if (template) setSrcDoc(injectShim(template, store));
       } catch {
@@ -83,6 +86,19 @@ export default function EditableHtmlCalendar({ dataEndpoint, templateKey, initia
     return () => window.removeEventListener("message", onMsg);
   }, [dataEndpoint]);
 
+  async function handleReset() {
+    if (!confirm("Xóa toàn bộ dữ liệu lịch đã lưu và bắt đầu lại từ mẫu trống?\n(Dùng khi lịch không hiện / bị lỗi. Thao tác này không hoàn tác được.)")) return;
+    try {
+      await api.put(dataEndpoint, { store: {} });
+      storeRef.current = {};
+      setSrcDoc(injectShim(tplRef.current || "", {}));
+      setNonce((n) => n + 1);
+      setSaveState("saved");
+    } catch {
+      alert("Không xóa được, thử lại giúp em nhé.");
+    }
+  }
+
   if (tpl === undefined)
     return <div className="flex justify-center py-20"><Loader2 className="animate-spin text-royal" size={26} /></div>;
 
@@ -98,11 +114,19 @@ export default function EditableHtmlCalendar({ dataEndpoint, templateKey, initia
 
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col">
-      <div className="flex items-center justify-end gap-2 py-1.5 text-xs">
+      <div className="flex items-center justify-end gap-3 py-1.5 text-xs">
         {saveState === "saving" && <span className="flex items-center gap-1 text-amber-600"><Save size={13} /> Đang lưu…</span>}
         {saveState === "saved" && <span className="flex items-center gap-1 text-green-600"><Check size={13} /> Đã lưu</span>}
+        <button
+          onClick={handleReset}
+          title="Xóa dữ liệu đã lưu, nạp lại mẫu trống (dùng khi lịch không hiện)"
+          className="flex items-center gap-1 rounded border border-gray-300 px-2 py-0.5 text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+        >
+          <RotateCcw size={12} /> Làm mới
+        </button>
       </div>
       <iframe
+        key={nonce}
         title="calendar"
         srcDoc={srcDoc}
         sandbox="allow-scripts allow-popups allow-modals allow-forms"
