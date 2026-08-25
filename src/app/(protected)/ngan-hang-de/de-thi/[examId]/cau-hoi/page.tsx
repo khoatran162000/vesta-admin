@@ -78,7 +78,7 @@ export default function QuestionListPage() {
   }
   if (loading) return <div className="flex justify-center py-20"><Loader2 size={24} className="animate-spin text-gold" /></div>;
   return (
-    <div className={`mx-auto max-w-[900px] ${canEdit ? "" : "select-none"}`}
+    <div className={`mx-auto max-w-[1100px] ${canEdit ? "" : "select-none"}`}
       onCopy={block} onCut={block} onContextMenu={block} onDragStart={block}>
       <style>{`
         .q-body table { width: 100% !important; max-width: 100% !important; }
