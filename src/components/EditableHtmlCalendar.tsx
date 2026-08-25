@@ -1,26 +1,27 @@
-// FILE: src/components/EditableHtmlCalendar.tsx — Lịch HTML dán vào: gõ trực tiếp + tự lưu server + in PDF + làm mới
+// FILE: src/components/EditableHtmlCalendar.tsx — Lịch HTML: dùng localStorage thật (allow-same-origin) + đồng bộ server
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Save, Check, RotateCcw } from "lucide-react";
 import { api } from "@/lib/api";
 
-// Chèn "cầu nối": thay localStorage bằng bản đồng bộ về server (iframe vẫn cách ly)
+// App lịch đọc localStorage trực tiếp -> iframe phải có allow-same-origin (nếu không sẽ throw SecurityError).
+// Shim: nạp dữ liệu server vào localStorage thật (chỉ key "vesta*"), rồi bọc Storage.prototype để đồng bộ ngược về server.
 function injectShim(template: string, store: Record<string, string>) {
   const seedJson = JSON.stringify(store || {}).replace(/<\/(script)/gi, "<\\/$1");
   const shim = `<script>
 (function(){
-  var store = ${seedJson};
-  function emit(){ try{ parent.postMessage({ __lscal: true, store: store }, "*"); }catch(e){} }
-  var fake = {
-    getItem: function(k){ k=String(k); return Object.prototype.hasOwnProperty.call(store,k)?store[k]:null; },
-    setItem: function(k,v){ store[String(k)]=String(v); emit(); },
-    removeItem: function(k){ delete store[String(k)]; emit(); },
-    clear: function(){ Object.keys(store).forEach(function(k){ delete store[k]; }); emit(); },
-    key: function(i){ return Object.keys(store)[i] || null; }
-  };
-  try{ Object.defineProperty(fake,"length",{ get:function(){ return Object.keys(store).length; } }); }catch(e){}
-  try{ Object.defineProperty(window,"localStorage",{ configurable:true, value: fake }); }
-  catch(e){ try{ window.localStorage = fake; }catch(_){} }
+  var SEED = ${seedJson};
+  function isApp(k){ return /^vesta/i.test(String(k)); }
+  try { Object.keys(SEED).forEach(function(k){ if(isApp(k)){ try{ localStorage.setItem(k, SEED[k]); }catch(e){} } }); } catch(e){}
+  function snap(){ var o={}; try{ for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(isApp(k)) o[k]=localStorage.getItem(k); } }catch(e){} return o; }
+  var t=null;
+  function sync(){ if(t)clearTimeout(t); t=setTimeout(function(){ try{ parent.postMessage({__lscal:true, store:snap()}, "*"); }catch(e){} }, 300); }
+  try {
+    ["setItem","removeItem","clear"].forEach(function(m){
+      var orig = Storage.prototype[m];
+      Storage.prototype[m] = function(){ var r = orig.apply(this, arguments); try{ if(this===window.localStorage) sync(); }catch(e){} return r; };
+    });
+  } catch(e){}
 })();
 </script>`;
   if (/<head[^>]*>/i.test(template)) return template.replace(/<head[^>]*>/i, function (m) { return m + shim; });
@@ -29,7 +30,7 @@ function injectShim(template: string, store: Record<string, string>) {
 }
 
 type Props = {
-  dataEndpoint: string;        // "/personal-calendar" | "/work-calendar"
+  dataEndpoint: string;
   templateKey?: string;
   initialTemplate?: string;
   emptyHint?: string;
@@ -39,7 +40,7 @@ export default function EditableHtmlCalendar({ dataEndpoint, templateKey, initia
   const [tpl, setTpl] = useState<string | null | undefined>(undefined);
   const [srcDoc, setSrcDoc] = useState<string>("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
-  const [nonce, setNonce] = useState(0); // đổi để buộc iframe nạp lại
+  const [nonce, setNonce] = useState(0);
   const storeRef = useRef<Record<string, string>>({});
   const tplRef = useRef<string>("");
   const timerRef = useRef<any>(null);
@@ -87,8 +88,16 @@ export default function EditableHtmlCalendar({ dataEndpoint, templateKey, initia
   }, [dataEndpoint]);
 
   async function handleReset() {
-    if (!confirm("Xóa toàn bộ dữ liệu lịch đã lưu và bắt đầu lại từ mẫu trống?\n(Dùng khi lịch không hiện / bị lỗi. Thao tác này không hoàn tác được.)")) return;
+    if (!confirm("Xóa toàn bộ dữ liệu lịch đã lưu và bắt đầu lại từ mẫu trống?\n(Dùng khi lịch không hiện / bị lỗi. Không hoàn tác được.)")) return;
     try {
+      try {
+        const rm: string[] = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const k = window.localStorage.key(i);
+          if (k && /^vesta/i.test(k)) rm.push(k);
+        }
+        rm.forEach((k) => window.localStorage.removeItem(k));
+      } catch {}
       await api.put(dataEndpoint, { store: {} });
       storeRef.current = {};
       setSrcDoc(injectShim(tplRef.current || "", {}));
@@ -129,7 +138,7 @@ export default function EditableHtmlCalendar({ dataEndpoint, templateKey, initia
         key={nonce}
         title="calendar"
         srcDoc={srcDoc}
-        sandbox="allow-scripts allow-popups allow-modals allow-forms"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-modals allow-forms"
         className="w-full flex-1 rounded-lg border border-gray-200"
       />
     </div>
