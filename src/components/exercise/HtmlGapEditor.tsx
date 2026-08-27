@@ -269,7 +269,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
       const href = el.getAttribute("href") || "";
       let a = "";
       if (href.startsWith("#")) { try { a = decodeURIComponent(href.slice(1)); } catch { a = href.slice(1); } }
-      a = a.replace(/[0-9i]{2,}$/, "").trim(); // bỏ đuôi mã hoá LearnClick (ASCII 0/i; chữ Việt có dấu không bị dính)
+      a = a.replace(/(?:0i0)+$/, "").trim(); // bỏ đuôi mã hoá LearnClick "0i00i00i0" (giữ nguyên chữ \u0027i\u0027 cuối của từ Việt)
       if (!a) a = (el.textContent || "").replace(/\s+/g, " ").trim();
       return a;
     };
