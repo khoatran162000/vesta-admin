@@ -259,6 +259,37 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     sel.removeAllRanges();
     emit();
   }, [emit, pushUndo]);
+  // ── Nhận diện gap từ HTML LearnClick: .cloze -> Ô điền, .clozedrop -> Dropdown ──
+  const importClozeGaps = useCallback(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const all = Array.from(host.querySelectorAll<HTMLElement>(".cloze, .clozedrop"));
+    if (!all.length) { alert("Không thấy .cloze / .clozedrop trong nội dung.\nHãy dán HTML từ LearnClick vào trước rồi bấm nút này."); return; }
+    const decodeDrop = (el: HTMLElement) => {
+      const href = el.getAttribute("href") || "";
+      let a = "";
+      if (href.startsWith("#")) { try { a = decodeURIComponent(href.slice(1)); } catch { a = href.slice(1); } }
+      a = a.replace(/[0-9i]{2,}$/, "").trim(); // bỏ đuôi mã hoá LearnClick (ASCII 0/i; chữ Việt có dấu không bị dính)
+      if (!a) a = (el.textContent || "").replace(/\s+/g, " ").trim();
+      return a;
+    };
+    const dropEls = all.filter((el) => el.classList.contains("clozedrop"));
+    const pool = Array.from(new Set(dropEls.map(decodeDrop).filter(Boolean)));
+    if (!confirm(`Nhận diện ${all.length} chỗ trống (${dropEls.length} dropdown, ${all.length - dropEls.length} ô điền)?\nCác dropdown sẽ dùng chung ${pool.length} lựa chọn.`)) return;
+    pushUndo();
+    all.forEach((el) => {
+      const id = String(nextId(host));
+      if (el.classList.contains("clozedrop")) {
+        el.replaceWith(buildChipEl(id, "DROPDOWN", decodeDrop(el), pool.join(", ")));
+      } else {
+        const ans = (el.textContent || "").replace(/\s+/g, " ").trim();
+        el.replaceWith(buildChipEl(id, "TEXT", ans, ""));
+      }
+    });
+    emit();
+    alert('Đã nhận diện xong. Nếu muốn đánh số lại theo thứ tự, bấm "Đánh lại số".');
+  }, [emit, pushUndo]);
+
   // ── Gộp các ô đã chọn thành 1 CÂU NHIỀU ĐÁP ÁN (không thứ tự) ──
   // Mọi ô nhận CHUNG tập đáp án (hợp các đáp án hiện có) + cùng group.
   const groupSelectedAsMultiAnswer = useCallback(() => {
@@ -599,6 +630,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
           <span className="mx-1 h-4 w-px bg-gray-300" />
           {/* Tạo gap hàng loạt từ [đáp án] */}
           <button type="button" onClick={makeGapsFromBrackets} className="rounded bg-teal-600 px-3 py-1 text-xs font-bold text-white hover:bg-teal-700" title="Bọc đáp án trong [ ] rồi bấm để tạo hàng loạt. Có dấu | thành dropdown.">⚡ Tạo gap từ [ ]</button>
+          <button type="button" onClick={importClozeGaps} className="rounded bg-indigo-600 px-3 py-1 text-xs font-bold text-white hover:bg-indigo-700" title="Sau khi dán HTML từ LearnClick: tự nhận .cloze -> Ô điền, .clozedrop -> Dropdown (giải mã đáp án + dựng lựa chọn dùng chung).">🔎 Nhận diện gap LearnClick</button>
           <span className="mx-1 h-4 w-px bg-gray-300" />
           {/* Gộp câu nhiều đáp án (không thứ tự) */}
           <button type="button" onClick={groupSelectedAsMultiAnswer} className="rounded bg-rose-600 px-3 py-1 text-xs font-bold text-white hover:bg-rose-700" title="Bôi đen nhiều ô rồi bấm: mọi ô nhận CHUNG tập đáp án. HS điền không cần đúng thứ tự; mỗi đáp án chỉ tính 1 lần. (⌘⇧M)">⇄ Gộp câu nhiều đáp án <span className="opacity-60">⌘⇧M</span></button>
