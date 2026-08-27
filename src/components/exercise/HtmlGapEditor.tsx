@@ -67,6 +67,9 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
   // ── Undo stack (thao tác gap không vào undo của trình duyệt → tự quản) ──
   const undoStack = useRef<string[]>([]);
   const [canUndo, setCanUndo] = useState(false);
+  const [htmlView, setHtmlView] = useState(false);
+  const [htmlSrc, setHtmlSrc] = useState("");
+  const gapsRef = useRef<Record<string, GapDef>>({});
   useImperativeHandle(ref, () => ({
     getData: () => {
       const host = hostRef.current;
@@ -585,6 +588,20 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     });
     emit();
   }
+  const enterHtmlView = useCallback(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const d = serializeHost(host);
+    gapsRef.current = d.gaps as Record<string, GapDef>;
+    setHtmlSrc(d.content);
+    setHtmlView(true);
+  }, []);
+  const applyHtmlView = useCallback(() => {
+    const host = hostRef.current;
+    if (host) { pushUndo(); host.innerHTML = contentToChipHtml(htmlSrc, gapsRef.current); }
+    setHtmlView(false);
+    emit();
+  }, [htmlSrc, emit, pushUndo]);
   const fmtBtn = "flex items-center justify-center rounded p-1.5 text-gray-600 hover:bg-gray-200";
   return (
     <div>
@@ -651,6 +668,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
           <span className="mx-1 h-4 w-px bg-gray-300" />
           <button type="button" onClick={undo} disabled={!canUndo} className="inline-flex items-center gap-1 rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-40" title="Hoàn tác thao tác chỗ trống gần nhất (⌘⇧Z)"><Undo2 size={13} />Hoàn tác</button>
           <button type="button" onClick={renumber} className="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100">Đánh lại số</button>
+          <button type="button" onClick={htmlView ? applyHtmlView : enterHtmlView} className="rounded border border-indigo-300 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100">{htmlView ? "▶ Về bài tập" : "⟨⟩ Xem mã HTML"}</button>
           <span className="ml-auto text-xs text-gray-500">Đang có <b>{count}</b> chỗ trống</span>
         </div>
         {/* Thanh ĐỊNH DẠNG CHỮ */}
@@ -700,7 +718,16 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
         .gap-edit-host td, .gap-edit-host th { overflow-wrap: anywhere; }
         .gap-edit-host img, .gap-edit-host iframe, .gap-edit-host video { max-width: 100%; }
       `}</style>
-      <div className="max-h-[60vh] overflow-auto rounded-lg border border-gray-300 focus-within:border-amber-400">
+      {htmlView && (
+        <div className="mb-2">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-xs font-bold text-indigo-700">Mã HTML của bài — sửa xong bấm Áp dụng (giữ [[gap:...]] để không mất chỗ trống)</span>
+            <button type="button" onClick={applyHtmlView} className="rounded bg-indigo-600 px-3 py-1 text-xs font-bold text-white hover:bg-indigo-700">✓ Áp dụng &amp; xem bài tập</button>
+          </div>
+          <textarea value={htmlSrc} onChange={(e) => setHtmlSrc(e.target.value)} spellCheck={false} rows={18} className="w-full rounded-lg border border-indigo-300 p-3 font-mono text-xs" />
+        </div>
+      )}
+      <div className={htmlView ? "hidden" : "max-h-[60vh] overflow-auto rounded-lg border border-gray-300 focus-within:border-amber-400"}>
         <div
           ref={hostRef}
           contentEditable
