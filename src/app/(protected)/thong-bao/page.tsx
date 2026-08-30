@@ -20,7 +20,7 @@ export default function NotificationsPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-[800px]">
+    <div className="mx-auto max-w-[1200px]">
       <div className="mb-5 flex items-center justify-between">
         <h2 className="font-display text-2xl font-bold text-royal">Thông báo</h2>
         <Link href="/thong-bao/gui-moi" className="btn-primary"><Send size={15} />Gửi thông báo</Link>
