@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2, RefreshCw, ExternalLink, CalendarDays, Save, X, Pencil, Plus, Trash2, Settings2, CalendarPlus } from "lucide-react";
 import { api } from "@/lib/api";
 
-type Day = { d: string; w: string; h?: string; l?: string };
+type Day = { d: string; w: string; h?: string; l?: string; n?: string };
 type Week = { i: number; u: number; d: Day[] };
 type Cls = { id: string; kg: string; r: string; w: Week[] };
 type CalData = Record<string, Cls[]>;
@@ -44,7 +44,7 @@ function nextWeek(cls: Cls): Week {
   return makeWeek(shiftIso(lastDay, 1), last.i + 1, last.u + 1);
 }
 
-type DayEdit = { wi: number; date: string; w: string; h: string; l: string } | null;
+type DayEdit = { wi: number; date: string; w: string; h: string; l: string; n: string } | null;
 type ClsForm = { mode: "add" | "edit"; level: string; srcId: string; id: string; kg: string; shift: boolean } | null;
 
 export default function LichHocPage() {
@@ -99,7 +99,7 @@ export default function LichHocPage() {
       const copy: CalData = { ...prev };
       copy[lv] = copy[lv].map((c) => c.id !== clsId ? c : {
         ...c, w: c.w.map((wk) => wk.i !== edit.wi ? wk : {
-          ...wk, d: wk.d.map((dd) => dd.d === edit.date ? { ...dd, h: newH || undefined, l: newL || undefined } : dd),
+          ...wk, d: wk.d.map((dd) => dd.d === edit.date ? { ...dd, h: newH || undefined, l: newL || undefined, n: (edit.n || "").trim() || undefined } : dd),
         }),
       });
       return copy;
@@ -295,7 +295,7 @@ export default function LichHocPage() {
                 {wk.d.map((day) => {
                   const isEdited = editedKeys.has(keyOf(wk.i, day.d));
                   return (
-                    <button key={day.d} type="button" onClick={() => setEdit({ wi: wk.i, date: day.d, w: day.w, h: day.h || "", l: day.l || "" })}
+                    <button key={day.d} type="button" onClick={() => setEdit({ wi: wk.i, date: day.d, w: day.w, h: day.h || "", l: day.l || "", n: day.n || "" })}
                       className={`group rounded-lg border p-2 text-left transition hover:border-gold hover:shadow ${isEdited ? "border-gold bg-gold/5" : "border-silver/20"}`}>
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-[#1a1a2e]">{Number(day.d.split("-")[2])}</span>
@@ -304,6 +304,7 @@ export default function LichHocPage() {
                       <div className="mt-1 min-h-[2.4rem]">
                         <div className="text-[0.8rem] font-semibold text-royal">{day.h || "—"}</div>
                         {day.l && <div className="mt-0.5 truncate text-[0.65rem] text-blue-600" title={day.l}>🔗 có link</div>}
+                        {day.n && <div className="mt-0.5 truncate text-[0.65rem] text-gray-500" title={day.n}>📝 {day.n}</div>}
                       </div>
                     </button>
                   );
@@ -330,6 +331,8 @@ export default function LichHocPage() {
                 <input type="text" value={edit.h} onChange={(e) => setEdit({ ...edit, h: e.target.value })} placeholder="Để trống nếu ngày nghỉ" className="input-field" autoFocus /></div>
               <div><label className="mb-1 block text-xs font-bold text-muted">Link bài tập</label>
                 <input type="text" value={edit.l} onChange={(e) => setEdit({ ...edit, l: e.target.value })} placeholder="https://... (để trống nếu không có)" className="input-field" /></div>
+              <div><label className="mb-1 block text-xs font-bold text-muted">Ghi chú (tự do — VD: nghỉ lễ / nội dung buổi học)</label>
+                <input type="text" value={edit.n} onChange={(e) => setEdit({ ...edit, n: e.target.value })} placeholder="Để trống nếu không cần" className="input-field" /></div>
             </div>
             <div className="mt-5 flex items-center justify-end gap-3">
               <button onClick={() => setEdit(null)} className="btn-secondary">Huỷ</button>
