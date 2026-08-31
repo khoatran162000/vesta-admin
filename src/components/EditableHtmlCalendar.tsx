@@ -138,7 +138,7 @@ export default function EditableHtmlCalendar({ dataEndpoint, templateKey, initia
         key={nonce}
         title="calendar"
         srcDoc={srcDoc}
-        sandbox="allow-scripts allow-same-origin allow-popups allow-modals allow-forms"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-modals allow-forms allow-downloads"
         className="w-full flex-1 rounded-lg border border-gray-200"
       />
     </div>
