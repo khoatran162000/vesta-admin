@@ -17,28 +17,30 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { useState, useCallback, useEffect, useRef } from "react";
-import { TextStyle } from "@tiptap/extension-text-style";
-import { Extension } from "@tiptap/core";
+import { Mark, mergeAttributes } from "@tiptap/core";
 
 // Extension nhỏ: cho phép chỉnh CỠ CHỮ + MÀU CHỮ (gắn thuộc tính vào textStyle)
-const InlineStyle = Extension.create({
+const InlineStyle = Mark.create({
   name: "inlineStyle",
-  addGlobalAttributes() {
-    return [{
-      types: ["textStyle"],
-      attributes: {
-        fontSize: {
-          default: null,
-          parseHTML: (el: any) => el.style.fontSize || null,
-          renderHTML: (attrs: any) => (attrs.fontSize ? { style: `font-size:${attrs.fontSize}` } : {}),
-        },
-        color: {
-          default: null,
-          parseHTML: (el: any) => el.style.color || null,
-          renderHTML: (attrs: any) => (attrs.color ? { style: `color:${attrs.color}` } : {}),
-        },
+  addAttributes() {
+    return {
+      fontSize: {
+        default: null,
+        parseHTML: (el: any) => el.style.fontSize || null,
+        renderHTML: (attrs: any) => (attrs.fontSize ? { style: `font-size:${attrs.fontSize}` } : {}),
       },
-    }];
+      color: {
+        default: null,
+        parseHTML: (el: any) => el.style.color || null,
+        renderHTML: (attrs: any) => (attrs.color ? { style: `color:${attrs.color}` } : {}),
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: "span", getAttrs: (el: any) => (el.style && (el.style.fontSize || el.style.color) ? {} : false) }];
+  },
+  renderHTML({ HTMLAttributes }: any) {
+    return ["span", mergeAttributes(HTMLAttributes), 0];
   },
 });
 
@@ -115,7 +117,6 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
       Underline,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Highlight.configure({ multicolor: false }),
-      TextStyle,
       InlineStyle,
       Youtube.configure({ width: 640, height: 360 }),
       Table.configure({ resizable: false }),
@@ -203,7 +204,7 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
           <Btn active={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Gạch chân — Ctrl+U"><span className="underline">U</span></Btn>
           <Btn active={editor.isActive("highlight")} onClick={() => editor.chain().focus().toggleHighlight().run()} title="Tô vàng highlight cho từ khoá"><span className="rounded bg-yellow-200 px-0.5">H</span></Btn>
           <Sep />
-          <select title="Cỡ chữ" defaultValue="" onChange={(e) => { const v = e.target.value; editor.chain().focus().setMark("textStyle", { fontSize: v || null }).run(); e.currentTarget.selectedIndex = 0; }} className="h-7 rounded border border-gray-300 bg-white px-1 text-xs text-gray-700">
+          <select title="Cỡ chữ" defaultValue="" onChange={(e) => { const v = e.target.value; editor.chain().focus().setMark("inlineStyle", { fontSize: v || null }).run(); e.currentTarget.selectedIndex = 0; }} className="h-7 rounded border border-gray-300 bg-white px-1 text-xs text-gray-700">
             <option value="">Cỡ chữ</option>
             <option value="13px">Nhỏ</option>
             <option value="16px">Thường</option>
@@ -212,12 +213,12 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
             <option value="32px">Khổng lồ</option>
           </select>
           {["#1a1a2e", "#C0392B", "#1B2A5C", "#B7950B", "#1E8449", "#2471A3"].map((c) => (
-            <button key={c} type="button" title={"Màu chữ " + c} onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().setMark("textStyle", { color: c }).run()} className="h-5 w-5 rounded border border-gray-300" style={{ backgroundColor: c }} />
+            <button key={c} type="button" title={"Màu chữ " + c} onMouseDown={(e) => e.preventDefault()} onClick={() => editor.chain().focus().setMark("inlineStyle", { color: c }).run()} className="h-5 w-5 rounded border border-gray-300" style={{ backgroundColor: c }} />
           ))}
           <label title="Màu tuỳ chọn" className="flex h-6 w-6 cursor-pointer items-center justify-center rounded border border-gray-300 text-[0.7rem]">🎨
-            <input type="color" onChange={(e) => editor.chain().focus().setMark("textStyle", { color: e.target.value }).run()} className="h-0 w-0 opacity-0" />
+            <input type="color" onChange={(e) => editor.chain().focus().setMark("inlineStyle", { color: e.target.value }).run()} className="h-0 w-0 opacity-0" />
           </label>
-          <Btn onClick={() => editor.chain().focus().setMark("textStyle", { color: null }).run()} title="Xoá màu chữ (về mặc định)"><span className="text-gray-400">A</span></Btn>
+          <Btn onClick={() => editor.chain().focus().setMark("inlineStyle", { color: null }).run()} title="Xoá màu chữ (về mặc định)"><span className="text-gray-400">A</span></Btn>
           <Sep />
           <Btn active={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="Tiêu đề lớn — dùng cho mỗi dạng bài/section chính">H2</Btn>
           <Btn active={editor.isActive("heading", { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} title="Tiêu đề phụ — dùng cho chiến thuật, ví dụ">H3</Btn>
