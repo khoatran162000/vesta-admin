@@ -35,7 +35,7 @@ export default function EditReportPage() {
       if (cl.success) setClasses(cl.data || []);
       if (data.success) {
         const r = data.data;
-        setStudentName(r.student?.fullName || "");
+        setStudentName(r.student?.fullName || r.studentName || "Chưa xác định");
         setStudentCode(r.student?.studentCode || "");
         setClassId(r.classId || "");
         setCourse(r.course || "");

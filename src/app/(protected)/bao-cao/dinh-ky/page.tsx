@@ -70,7 +70,7 @@ export default function ReportListPage() {
               {reports.map((r) => (
                 <tr key={r.id} className="border-b border-silver/10 hover:bg-cream/50">
                   <td className="px-4 py-3 font-medium text-[#1a1a2e]">
-                    {r.student?.fullName}
+                    {r.student?.fullName || r.studentName || "Chưa xác định"}
                     <div className="text-xs font-mono text-muted">{r.student?.studentCode}</div>
                   </td>
                   <td className="px-4 py-3">

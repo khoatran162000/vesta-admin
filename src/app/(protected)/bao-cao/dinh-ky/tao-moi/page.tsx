@@ -16,6 +16,7 @@ export default function CreateReportPage() {
   const [classId, setClassId] = useState("");
   const [classStudents, setClassStudents] = useState<Student[] | null>(null);
   const [studentId, setStudentId] = useState("");
+  const [studentName, setStudentName] = useState("");
   const [course, setCourse] = useState("");
   const [learnclickUser, setLearnclickUser] = useState("");
   const [padletAccount, setPadletAccount] = useState("");
@@ -56,11 +57,13 @@ export default function CreateReportPage() {
     if (s?.course) setCourse(s.course);
   }
   async function handleSave(status: "DRAFT" | "PUBLISHED") {
-    if (!studentId) return alert("Vui lòng chọn học sinh");
+    if (!studentId && !studentName.trim()) return alert("Vui lòng chọn học sinh hoặc nhập tên HV ngoài hệ thống");
     if (mode === "html" && !html.trim()) return alert("Vui lòng dán mã HTML của report");
     setSaving(true);
     const payload: any = {
-      studentId, course, learnclickUser, padletAccount,
+      studentId: studentName.trim() ? null : studentId,
+      studentName: studentName.trim() || null,
+      course, learnclickUser, padletAccount,
       classId: classId || null,
       periodTo: periodTo || null, dataFrom: dataFrom || null, dataTo: dataTo || null,
       status,
@@ -111,6 +114,8 @@ export default function CreateReportPage() {
               ))}
             </select>
             {classStudents && <p className="mt-1 text-[0.7rem] text-muted">Đang lọc theo lớp — {classStudents.length} học viên</p>}
+            <input type="text" value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="Hoặc gõ tên HV ngoài hệ thống (nếu không có trong danh sách)" className="input-field mt-2" />
+            <button type="button" onClick={() => setStudentName("Chưa xác định")} className="mt-1 text-[0.7rem] font-medium text-gold hover:underline">Dùng “Chưa xác định” (unidentified)</button>
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Lớp / Khoá</label>
