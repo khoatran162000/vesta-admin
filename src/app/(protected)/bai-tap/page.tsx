@@ -20,6 +20,8 @@ export default function ExerciseListPage() {
   const [exercises, setExercises] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dupId, setDupId] = useState<string | null>(null);
+  const [levelFilter, setLevelFilter] = useState("");
+  const [q, setQ] = useState("");
   useEffect(() => { loadData(); }, []);
   async function loadData() {
     setLoading(true);
@@ -51,6 +53,13 @@ export default function ExerciseListPage() {
         <div>
           <h2 className="font-display text-2xl font-bold text-royal">🎯 Bài Tập Tương Tác</h2>
           <p className="mt-1 text-sm text-muted">{exercises.length} bài tập · Quiz, Fill blank, Matching, Vocab</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm bài…" className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm" />
+            <button onClick={() => setLevelFilter("")} className={`rounded-full px-3 py-1 text-xs font-semibold ${!levelFilter ? "bg-[#1B2A5C] text-white" : "bg-gray-100 text-gray-600"}`}>Tất cả</button>
+            {Array.from(new Set(exercises.map((e: any) => (String(e.title).match(/^\s*\[([^·\]]+)/) || [])[1]?.trim()).filter(Boolean))).map((lv: any) => (
+              <button key={lv} onClick={() => setLevelFilter(lv)} className={`rounded-full px-3 py-1 text-xs font-semibold ${levelFilter === lv ? "bg-[#1B2A5C] text-white" : "bg-gray-100 text-gray-600"}`}>{lv}</button>
+            ))}
+          </div>
         </div>
         {canEdit && (
           <Link href="/bai-tap/tao-moi" className="btn-primary">
@@ -79,7 +88,7 @@ export default function ExerciseListPage() {
               <th className="px-4 py-3 text-right font-semibold text-royal">Thao tác</th>
             </tr></thead>
             <tbody>
-              {exercises.map((ex) => {
+              {exercises.filter((ex: any) => { const lv = (String(ex.title).match(/^\s*\[([^·\]]+)/) || [])[1]?.trim() || ""; return (!levelFilter || lv === levelFilter) && (!q || String(ex.title).toLowerCase().includes(q.toLowerCase())); }).map((ex) => {
                 const qs = typeof ex.questions === "string" ? JSON.parse(ex.questions) : ex.questions;
                 const count = typeof ex.questionCount === "number" ? ex.questionCount : (Array.isArray(qs) ? qs.length : 0);
                 const vis = VIS_LABELS[ex.visibility] || VIS_LABELS.PUBLIC;
