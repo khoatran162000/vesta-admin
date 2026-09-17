@@ -44,12 +44,12 @@ export default function ExerciseMeta({ meta, onChange }: Props) {
         <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Phân quyền</label>
         <select value={meta.visibility} onChange={(e) => set("visibility", e.target.value)} className="input-field">
           <option value="PUBLIC">Công khai (ai cũng thấy)</option>
-          <option value="CLASS">Theo lớp</option>
+          <option value="CLASS">Theo khối / trình độ</option>
         </select>
       </div>
       {meta.visibility === "CLASS" && (
         <div>
-          <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Chọn lớp</label>
+          <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-muted">Chọn khối (HS thuộc khối đó sẽ thấy bài)</label>
           <div className="flex flex-wrap gap-2">
             {COURSES.map((c) => (
               <button key={c} type="button" onClick={() => toggleClass(c)}
