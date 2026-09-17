@@ -56,9 +56,12 @@ export default function ExerciseListPage() {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm bài…" className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm" />
             <button onClick={() => setLevelFilter("")} className={`rounded-full px-3 py-1 text-xs font-semibold ${!levelFilter ? "bg-[#1B2A5C] text-white" : "bg-gray-100 text-gray-600"}`}>Tất cả</button>
-            {Array.from(new Set(exercises.map((e: any) => (String(e.title).match(/^\s*\[([^·\]]+)/) || [])[1]?.trim()).filter(Boolean))).map((lv: any) => (
+            {Array.from(new Set(exercises.map((e: any) => e.level).filter(Boolean))).map((lv: any) => (
               <button key={lv} onClick={() => setLevelFilter(lv)} className={`rounded-full px-3 py-1 text-xs font-semibold ${levelFilter === lv ? "bg-[#1B2A5C] text-white" : "bg-gray-100 text-gray-600"}`}>{lv}</button>
             ))}
+            {exercises.some((e: any) => !e.level) && (
+              <button onClick={() => setLevelFilter("__uncat__")} className={`rounded-full px-3 py-1 text-xs font-semibold ${levelFilter === "__uncat__" ? "bg-[#1B2A5C] text-white" : "bg-gray-100 text-gray-600"}`}>Chưa phân loại</button>
+            )}
           </div>
         </div>
         {canEdit && (
@@ -88,7 +91,7 @@ export default function ExerciseListPage() {
               <th className="px-4 py-3 text-right font-semibold text-royal">Thao tác</th>
             </tr></thead>
             <tbody>
-              {exercises.filter((ex: any) => { const lv = (String(ex.title).match(/^\s*\[([^·\]]+)/) || [])[1]?.trim() || ""; return (!levelFilter || lv === levelFilter) && (!q || String(ex.title).toLowerCase().includes(q.toLowerCase())); }).map((ex) => {
+              {exercises.filter((ex: any) => { const lv = ex.level || ""; return (!levelFilter || (levelFilter === "__uncat__" ? !lv : lv === levelFilter)) && (!q || String(ex.title).toLowerCase().includes(q.toLowerCase())); }).map((ex) => {
                 const qs = typeof ex.questions === "string" ? JSON.parse(ex.questions) : ex.questions;
                 const count = typeof ex.questionCount === "number" ? ex.questionCount : (Array.isArray(qs) ? qs.length : 0);
                 const vis = VIS_LABELS[ex.visibility] || VIS_LABELS.PUBLIC;
