@@ -51,6 +51,7 @@ const NAV: NavItem[] = [
   ]},
   { href: "/theo-doi", label: "Theo dõi học viên", icon: GraduationCap, roles: STAFF },
   { href: "/theo-doi/ky-luat", label: "Kỷ luật học tập", icon: ShieldAlert, roles: STAFF },
+  { href: "/theo-doi/hom-nay", label: "Tóm tắt hôm nay", icon: Calendar, roles: STAFF },
   { label: "Báo cáo", icon: BarChart3, roles: STAFF, children: [
     { href: "/bao-cao", label: "Tổng hợp điểm" },
     { href: "/bao-cao/dinh-ky", label: "Báo cáo định kỳ" },
