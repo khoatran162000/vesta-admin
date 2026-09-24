@@ -59,6 +59,19 @@ export default function LichHocPage() {
   const [msg, setMsg] = useState("");
   const [structEdit, setStructEdit] = useState(false);
   const [clsForm, setClsForm] = useState<ClsForm>(null);
+  const [showHtml, setShowHtml] = useState(false);
+  const [htmlText, setHtmlText] = useState("");
+  const [htmlSaving, setHtmlSaving] = useState(false);
+  const [htmlMsg, setHtmlMsg] = useState("");
+  useEffect(() => { (async () => { try { const r: any = await api.get("/site-content/calendar_html"); setHtmlText(r?.data?.data?.html || ""); } catch {} })(); }, []);
+  async function saveHtml() {
+    setHtmlSaving(true); setHtmlMsg("");
+    try {
+      const res: any = await api.put("/site-content/calendar_html", { label: "Lịch làm bài (HTML)", data: JSON.stringify({ html: htmlText }) });
+      setHtmlMsg(res?.success ? "Đã lưu — học sinh & phụ huynh sẽ xem bản HTML này." : (res?.message || "Lỗi lưu"));
+    } catch { setHtmlMsg("Lỗi server khi lưu"); }
+    finally { setHtmlSaving(false); }
+  }
 
   async function load() {
     setLoading(true);
@@ -239,6 +252,31 @@ export default function LichHocPage() {
           <button onClick={() => setStructEdit((v) => !v)} className={structEdit ? "btn-primary" : "btn-secondary"}><Settings2 size={14} />Chỉnh cấu trúc {structEdit ? ": BẬT" : ""}</button>
           <button onClick={load} className="btn-secondary"><RefreshCw size={14} />Tải lại</button>
           <a href="https://vestaedu.online/lich-lam-bai" target="_blank" rel="noopener noreferrer" className="btn-secondary"><ExternalLink size={14} />Xem trang HV</a>
+          <button type="button" onClick={() => setShowHtml(true)} className="btn-secondary">{"<>"} Dán HTML</button>
+          {showHtml && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={(e) => { if (e.target === e.currentTarget) setShowHtml(false); }}>
+              <div className="w-full max-w-[820px] max-h-[90vh] overflow-auto rounded-xl bg-white p-5 shadow-xl">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="font-display text-lg font-bold text-royal">Dán HTML lịch làm bài</h3>
+                  <button type="button" onClick={() => setShowHtml(false)} className="text-muted hover:text-royal">✕</button>
+                </div>
+                <p className="mb-2 text-xs text-muted">Dán nguyên trang HTML lịch. Khi có nội dung, học sinh & phụ huynh sẽ xem bản HTML này thay cho form. Muốn quay lại dùng form: xoá hết HTML rồi Lưu.</p>
+                <textarea value={htmlText} onChange={(e) => setHtmlText(e.target.value)} rows={14} placeholder="<!doctype html> ..." className="w-full rounded-lg border border-silver/40 p-3 font-mono text-xs" />
+                <div className="mt-3 rounded-lg border border-gold/30 bg-gold/5 p-3">
+                  <p className="mb-1 text-xs font-bold text-royal">Link chia sẻ cho phụ huynh:</p>
+                  <div className="flex gap-2">
+                    <input readOnly value="https://vestaedu.online/lich-lam-bai" onFocus={(e) => e.currentTarget.select()} className="input-field flex-1 text-xs" />
+                    <button type="button" onClick={() => { try { navigator.clipboard.writeText("https://vestaedu.online/lich-lam-bai"); setHtmlMsg("Đã copy link chia sẻ."); } catch {} }} className="btn-secondary">Copy</button>
+                  </div>
+                </div>
+                {htmlMsg && <p className="mt-2 text-xs font-medium text-green-700">{htmlMsg}</p>}
+                <div className="mt-4 flex justify-end gap-2">
+                  <button type="button" onClick={() => setShowHtml(false)} className="btn-secondary">Đóng</button>
+                  <button type="button" onClick={saveHtml} disabled={htmlSaving} className="btn-primary"><Save size={14} />{htmlSaving ? "Đang lưu..." : "Lưu HTML"}</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
