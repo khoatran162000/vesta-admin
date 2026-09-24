@@ -106,6 +106,9 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
   const [htmlSource, setHtmlSource] = useState("");
   const [cssSource, setCssSource] = useState("");
   const skipSync = useRef(false);
+  const [raw, setRaw] = useState<boolean>(() => /<\s*style[\s>]|<!doctype|<html[\s>]/i.test(content || ""));
+  const [rawText, setRawText] = useState<string>(content || "");
+  const rawRef = useRef(raw); rawRef.current = raw;
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -126,13 +129,14 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
     editorProps: { attributes: { class: "vesta-editor-content" } },
     onUpdate: ({ editor: e }) => {
       if (skipSync.current) return;
+      if (rawRef.current) return;
       onChange?.(injectCSS(e.getHTML(), cssSource));
     },
   });
 
   useEffect(() => { const { css, body } = extractCSS(content); setCssSource(css); setHtmlSource(body); }, []);
   useEffect(() => {
-    if (editor && content && !skipSync.current) {
+    if (editor && content && !skipSync.current && !rawRef.current) {
       const { body } = extractCSS(content);
       if (editor.getHTML() !== body) editor.commands.setContent(body);
     }
@@ -183,6 +187,19 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
   const addTable = useCallback(() => { editor?.chain().focus().insertTable({ rows: 4, cols: 4, withHeaderRow: true }).run(); }, [editor]);
 
   if (!editor) return null;
+
+  if (raw) {
+    return (
+      <div className="overflow-hidden rounded-xl border border-indigo-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between gap-2 border-b border-indigo-100 bg-indigo-50 px-3 py-2">
+          <span className="text-xs font-bold text-indigo-700">📄 HTML nguyên — giữ đúng định dạng bài dán (không qua trình soạn)</span>
+          <button type="button" onClick={() => { skipSync.current = true; editor.commands.setContent(extractCSS(rawText).body); skipSync.current = false; setRaw(false); onChange?.(rawText); }} className="rounded border border-indigo-300 px-2 py-0.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100">Dùng trình soạn thường</button>
+        </div>
+        <textarea value={rawText} onChange={(e) => { setRawText(e.target.value); onChange?.(e.target.value); }} spellCheck={false} rows={24} placeholder="Dán nguyên mã HTML bài viết vào đây (giữ style, layout)..." className="w-full resize-y p-4 font-mono text-xs outline-none" />
+        <p className="border-t border-gray-100 px-3 py-2 text-[0.7rem] text-gray-500">Bài này sẽ hiển thị đúng như HTML bạn dán (giống trang chia sẻ). Dùng cho bài thiết kế sẵn bằng HTML.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
