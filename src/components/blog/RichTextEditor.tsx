@@ -202,7 +202,21 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div
+      className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
+      onPasteCapture={(e) => {
+        if (rawRef.current || viewMode !== "visual") return;
+        const cd = e.clipboardData; if (!cd) return;
+        const html = cd.getData("text/html") || "";
+        const text = cd.getData("text/plain") || "";
+        const SIG = /data-vesta|data-layout-root|<!doctype|<html[\s>]|<\s*style[\s>]/i;
+        const rawHtml = SIG.test(text) ? text : (SIG.test(html) ? html : "");
+        if (rawHtml) {
+          e.preventDefault(); e.stopPropagation();
+          setRawText(rawHtml); setRaw(true); onChange?.(rawHtml);
+        }
+      }}
+    >
       {/* ═══════ VIEW MODE TABS ═══════ */}
       <div className="flex items-end gap-1 border-b border-gray-200 bg-gray-50 px-2 pt-2">
         <Tab active={viewMode === "visual"} onClick={() => switchMode("visual")} title="Soạn thảo trực quan — kéo thả, click để định dạng">✏️ Visual</Tab>
