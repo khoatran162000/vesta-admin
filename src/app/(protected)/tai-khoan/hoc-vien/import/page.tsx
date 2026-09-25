@@ -8,6 +8,7 @@ import { useLevels } from "@/lib/useLevels";
 interface StudentRow {
   fullName: string; course: string; className: string; startDate: string;
   phone: string; email: string; address: string;
+  studentCode: string; password: string;
 }
 // Chuẩn hoá ngày về YYYY-MM-DD để backend dựng mã đúng ngày.
 function normalizeDate(v: any): string {
@@ -66,6 +67,7 @@ export default function ImportStudentsPage() {
         fullName: p[0] || "", course: p[1] || "", className: p[2] || "",
         startDate: normalizeDate(p[3] || ""),
         phone: p[4] || "", email: p[5] || "", address: p[6] || "",
+        studentCode: p[7] || "", password: p[8] || "",
       };
     }).filter((s) => s.fullName);
   }
@@ -91,6 +93,8 @@ export default function ImportStudentsPage() {
           phone: r[4] === undefined || r[4] === null ? "" : String(r[4]).trim(),
           email: String(r[5] || "").trim(),
           address: String(r[6] || "").trim(),
+          studentCode: String(r[7] || "").trim(),
+          password: r[8] === undefined || r[8] === null ? "" : String(r[8]).trim(),
         });
       }
       setExcelData(parsed.filter((s) => s.fullName));
@@ -100,19 +104,24 @@ export default function ImportStudentsPage() {
   // Tải mẫu Excel — 7 cột
   async function downloadTemplate() {
     const XLSX = await import("xlsx");
-    const header = ["Họ tên", "Trình độ", "Lớp", "Ngày đăng ký", "SĐT", "Email", "Địa chỉ"];
+    const header = ["Họ tên", "Trình độ", "Lớp", "Ngày đăng ký", "SĐT", "Email", "Địa chỉ", "Tài khoản (tùy chọn)", "Mật khẩu (tùy chọn)"];
     const sample = [
-      ["Lê Hương Ly", COURSES[0] || "7+", classNames[0] || "7+0726", "17/07/2026", "0912345678", "ly@gmail.com", "123 Hoàng Quốc Việt, HN"],
-      ["Trần Gia Huy", COURSES[0] || "7+", "", "17/07/2026", "0987654321", "", ""],
+      ["Lê Hương Ly", COURSES[0] || "7+", classNames[0] || "7+0726", "17/07/2026", "0912345678", "ly@gmail.com", "123 Hoàng Quốc Việt, HN", "", ""],
+      ["Trần Gia Huy", COURSES[0] || "7+", "", "17/07/2026", "0987654321", "", "", "trangiahuy", ""],
     ];
     const ws = XLSX.utils.aoa_to_sheet([header, ...sample]);
-    ws["!cols"] = [{ wch: 20 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 22 }, { wch: 28 }];
+    ws["!cols"] = [{ wch: 20 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 22 }, { wch: 28 }, { wch: 20 }, { wch: 16 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Học viên");
     XLSX.writeFile(wb, "mau-import-hoc-vien.xlsx");
   }
   async function handleImport() {
-    const students = mode === "text" ? parseText() : excelData;
+    const rows = mode === "text" ? parseText() : excelData;
+    const students = rows.map((s) => {
+      const code = (s.studentCode || "").trim();
+      const pw = (s.password || "").trim();
+      return { ...s, studentCode: code || undefined, password: pw || undefined };
+    });
     if (!students.length) return;
     setLoading(true); setResult(null);
     try {
@@ -146,10 +155,10 @@ export default function ImportStudentsPage() {
       <div className="card space-y-4">
         {/* Format hint */}
         <div className="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-800">
-          <p className="font-bold">Format: 7 cột (đúng thứ tự)</p>
-          <p className="mt-0.5 text-xs">Họ tên*, <b>Trình độ*</b>, <b>Lớp</b>, Ngày đăng ký*, SĐT, Email, Địa chỉ</p>
+          <p className="font-bold">Format: 9 cột (đúng thứ tự)</p>
+          <p className="mt-0.5 text-xs">Họ tên*, <b>Trình độ*</b>, <b>Lớp</b>, Ngày đăng ký*, SĐT, Email, Địa chỉ, <b>Tài khoản</b>, <b>Mật khẩu</b></p>
           <p className="mt-1 text-xs">
-            Mã HV tự sinh theo <b>tên + trình độ + ngày</b> (vd <code>lehuongly7240726</code>). Cột <b>Lớp</b> để xếp HS vào lớp cụ thể (khớp theo tên lớp trong Quản lý lớp học); để trống nếu chưa xếp. Mật khẩu = <b>SĐT</b>. Ngày dạng <b>dd/mm/yyyy</b>. Chỉ Họ tên/Trình độ/Ngày bắt buộc.
+            Cột <b>Tài khoản</b> (không bắt buộc): tự đặt tên đăng nhập cho HS (vd <code>buiphuongnga50826A</code>); để trống thì hệ thống tự sinh mã theo <b>tên + trình độ + ngày</b>. Cột <b>Mật khẩu</b> (không bắt buộc): để trống thì lấy <b>SĐT</b> làm mật khẩu. Cột <b>Lớp</b> để trống nếu chưa xếp lớp. Ngày dạng <b>dd/mm/yyyy</b>. Chỉ Họ tên/Trình độ/Ngày bắt buộc.
           </p>
           <button onClick={downloadTemplate} className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-royal hover:bg-cream">
             <Download size={13} />Tải mẫu
@@ -181,7 +190,7 @@ export default function ImportStudentsPage() {
                 <FileSpreadsheet size={28} />
                 <div className="text-center">
                   <p className="text-sm font-semibold text-royal">Chọn file Excel (.xlsx)</p>
-                  <p className="text-xs">7 cột: Họ tên, Trình độ, Lớp, Ngày ĐK, SĐT, Email, Địa chỉ</p>
+                  <p className="text-xs">9 cột: Họ tên, Trình độ, Lớp, Ngày ĐK, SĐT, Email, Địa chỉ, Tài khoản, Mật khẩu</p>
                 </div>
               </button>
             )}
@@ -220,6 +229,7 @@ export default function ImportStudentsPage() {
                   <th className="px-2 py-2 text-muted">Ngày ĐK</th>
                   <th className="px-2 py-2 text-muted">SĐT</th>
                   <th className="px-2 py-2 text-muted">Email</th>
+                  <th className="px-2 py-2 text-muted">Tài khoản</th>
                 </tr></thead>
                 <tbody>{preview.slice(0, 20).map((s, i) => (
                   <tr key={i} className="border-b border-silver/10">
@@ -238,6 +248,7 @@ export default function ImportStudentsPage() {
                     <td className="px-2 py-1.5 text-muted">{s.startDate || <span className="text-red-500">(thiếu)</span>}</td>
                     <td className="px-2 py-1.5 text-muted">{s.phone || "—"}</td>
                     <td className="px-2 py-1.5 text-muted truncate max-w-[140px]">{s.email || "—"}</td>
+                    <td className="px-2 py-1.5 text-muted">{s.studentCode || "(tự sinh)"}</td>
                   </tr>
                 ))}</tbody>
               </table>
