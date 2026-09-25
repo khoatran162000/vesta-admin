@@ -106,7 +106,7 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
   const [htmlSource, setHtmlSource] = useState("");
   const [cssSource, setCssSource] = useState("");
   const skipSync = useRef(false);
-  const [raw, setRaw] = useState<boolean>(() => /<\s*style[\s>]|<!doctype|<html[\s>]/i.test(content || ""));
+  const [raw, setRaw] = useState<boolean>(() => /<!doctype|<html[\s>]|<\s*style[\s>]|data-vesta|data-layout-root/i.test(content || ""));
   const [rawText, setRawText] = useState<string>(content || "");
   const rawRef = useRef(raw); rawRef.current = raw;
 
