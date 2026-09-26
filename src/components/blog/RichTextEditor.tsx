@@ -141,6 +141,13 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
       if (editor.getHTML() !== body) editor.commands.setContent(body);
     }
   }, [content, editor]);
+  // Mở lại bài đã lưu dạng HTML nguyên: content tới sau mount & là mã VESTA -> vào chế độ HTML nguyên
+  useEffect(() => {
+    if (content && !rawRef.current && /<!doctype|<html[\s>]|<\s*style[\s>]|data-vesta|data-layout-root/i.test(content)) {
+      setRawText(content);
+      setRaw(true);
+    }
+  }, [content]);
 
   /* ── Switch mode ── */
   const switchMode = (mode: ViewMode) => {
