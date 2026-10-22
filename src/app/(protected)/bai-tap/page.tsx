@@ -1,18 +1,32 @@
 // FILE: src/app/(protected)/bai-tap/page.tsx — Danh sách bài tập tương tác
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Loader2, Eye, EyeOff, PenTool, BarChart3, Copy } from "lucide-react";
+import { Plus, Trash2, Loader2, Eye, EyeOff, PenTool, BarChart3, Copy, Link2, Check, ArrowDownAZ, Clock } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { canEditContent } from "@/lib/permissions";
+
+const STUDENT_URL = "https://student.vestaedu.online";
+
 const VIS_LABELS: Record<string, { label: string; color: string }> = {
   PUBLIC: { label: "Công khai", color: "bg-green-50 text-green-700" },
   STUDENT: { label: "Học viên", color: "bg-blue-50 text-blue-700" },
   TEACHER: { label: "Giáo viên", color: "bg-purple-50 text-purple-700" },
   CLASS: { label: "Theo lớp", color: "bg-amber-50 text-amber-700" },
 };
+
+// Khối của một bài = gộp nhãn LV: (mô tả) + các lớp được tick (visibleTo khi CLASS)
+function exKhoi(ex: any): string[] {
+  const tags = new Set<string>();
+  if (ex.level) tags.add(String(ex.level).trim());
+  if (ex.visibility === "CLASS" && ex.visibleTo) {
+    String(ex.visibleTo).split(",").map((s: string) => s.trim()).filter(Boolean).forEach((t: string) => tags.add(t));
+  }
+  return [...tags];
+}
+
 export default function ExerciseListPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -22,6 +36,9 @@ export default function ExerciseListPage() {
   const [dupId, setDupId] = useState<string | null>(null);
   const [levelFilter, setLevelFilter] = useState("");
   const [q, setQ] = useState("");
+  const [sortMode, setSortMode] = useState<"recent" | "az">("recent");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   useEffect(() => { loadData(); }, []);
   async function loadData() {
     setLoading(true);
@@ -47,6 +64,33 @@ export default function ExerciseListPage() {
     if (res.success && res.data?.id) router.push(`/bai-tap/${res.data.id}/sua`);
     else alert(res.message || "Không có quyền thực hiện / lỗi nhân bản");
   }
+  function copyLink(id: string) {
+    const url = `${STUDENT_URL}/bai-tap/${id}`;
+    try { navigator.clipboard?.writeText(url); } catch {}
+    setCopiedId(id); setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1500);
+  }
+
+  const khoiList = useMemo(() => {
+    const s = new Set<string>();
+    exercises.forEach((e) => exKhoi(e).forEach((k) => s.add(k)));
+    return [...s].sort((a, b) => a.localeCompare(b, "vi"));
+  }, [exercises]);
+  const hasUncat = exercises.some((e) => exKhoi(e).length === 0);
+
+  const shown = useMemo(() => {
+    const kw = q.trim().toLowerCase();
+    return exercises
+      .filter((ex) => {
+        const matchQ = !kw || String(ex.title).toLowerCase().includes(kw);
+        if (kw) return matchQ; // đang tìm -> bỏ qua lọc khối, ra hết mọi khối
+        const khoi = exKhoi(ex);
+        return !levelFilter || (levelFilter === "__uncat__" ? khoi.length === 0 : khoi.includes(levelFilter));
+      })
+      .sort((a, b) => sortMode === "az"
+        ? String(a.title || "").localeCompare(String(b.title || ""), "vi")
+        : new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
+  }, [exercises, q, levelFilter, sortMode]);
+
   return (
     <div className="mx-auto max-w-[1100px]">
       <div className="mb-6 flex items-center justify-between">
@@ -56,12 +100,15 @@ export default function ExerciseListPage() {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm bài…" className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm" />
             <button onClick={() => setLevelFilter("")} className={`rounded-full px-3 py-1 text-xs font-semibold ${!levelFilter ? "bg-[#1B2A5C] text-white" : "bg-gray-100 text-gray-600"}`}>Tất cả</button>
-            {Array.from(new Set(exercises.map((e: any) => e.level).filter(Boolean))).map((lv: any) => (
+            {khoiList.map((lv) => (
               <button key={lv} onClick={() => setLevelFilter(lv)} className={`rounded-full px-3 py-1 text-xs font-semibold ${levelFilter === lv ? "bg-[#1B2A5C] text-white" : "bg-gray-100 text-gray-600"}`}>{lv}</button>
             ))}
-            {exercises.some((e: any) => !e.level) && (
+            {hasUncat && (
               <button onClick={() => setLevelFilter("__uncat__")} className={`rounded-full px-3 py-1 text-xs font-semibold ${levelFilter === "__uncat__" ? "bg-[#1B2A5C] text-white" : "bg-gray-100 text-gray-600"}`}>Chưa phân loại</button>
             )}
+            <span className="mx-1 h-4 w-px bg-gray-300" />
+            <button onClick={() => setSortMode("recent")} className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${sortMode === "recent" ? "bg-[#1B2A5C] text-white" : "bg-gray-100 text-gray-600"}`} title="Mới sửa gần nhất"><Clock size={12} />Mới sửa</button>
+            <button onClick={() => setSortMode("az")} className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${sortMode === "az" ? "bg-[#1B2A5C] text-white" : "bg-gray-100 text-gray-600"}`} title="Sắp xếp A-Z"><ArrowDownAZ size={12} />A-Z</button>
           </div>
         </div>
         {canEdit && (
@@ -91,14 +138,13 @@ export default function ExerciseListPage() {
               <th className="px-4 py-3 text-right font-semibold text-royal">Thao tác</th>
             </tr></thead>
             <tbody>
-              {exercises.filter((ex: any) => { const lv = ex.level || ""; return (!levelFilter || (levelFilter === "__uncat__" ? !lv : lv === levelFilter)) && (!q || String(ex.title).toLowerCase().includes(q.toLowerCase())); }).map((ex) => {
+              {shown.map((ex) => {
                 const qs = typeof ex.questions === "string" ? JSON.parse(ex.questions) : ex.questions;
                 const count = typeof ex.questionCount === "number" ? ex.questionCount : (Array.isArray(qs) ? qs.length : 0);
                 const vis = VIS_LABELS[ex.visibility] || VIS_LABELS.PUBLIC;
                 return (
                   <tr key={ex.id} className="border-b border-silver/10 hover:bg-cream/50">
                     <td className="px-4 py-3 font-medium text-[#1a1a2e]">
-                      {/* Bấm tiêu đề → xem như học sinh (làm thử) */}
                       <Link href={`/bai-tap/${ex.id}/xem`} className="hover:text-royal hover:underline" title="Xem như học sinh (làm thử)">
                         {ex.title}
                       </Link>
@@ -110,7 +156,6 @@ export default function ExerciseListPage() {
                       {ex.visibility === "CLASS" && ex.visibleTo && <span className="ml-1 text-xs text-muted">({ex.visibleTo})</span>}
                     </td>
                     <td className="px-4 py-3">
-                      {/* GV: badge chỉ để xem — PUT /interactive là ADMIN-only, bấm sẽ 403 */}
                       {canEdit ? (
                         <button onClick={() => togglePublish(ex)}
                           className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${ex.isPublished ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
@@ -123,7 +168,9 @@ export default function ExerciseListPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {/* Xem như học sinh — mọi vai đều thấy */}
+                      <button onClick={() => copyLink(ex.id)} title="Copy link cho học sinh" className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal">
+                        {copiedId === ex.id ? <Check size={14} className="text-green-600" /> : <Link2 size={14} />}
+                      </button>
                       <Link href={`/bai-tap/${ex.id}/xem`} title="Xem như học sinh (làm thử)" className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Eye size={14} /></Link>
                       <Link href={`/bai-tap/${ex.id}/thong-ke`} title="Thống kê" className="mr-1 inline-flex rounded p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><BarChart3 size={14} /></Link>
                       {canEdit && (
