@@ -66,6 +66,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
   const [uploadingImg, setUploadingImg] = useState(false);
   // ── Undo stack (thao tác gap không vào undo của trình duyệt → tự quản) ──
   const undoStack = useRef<string[]>([]);
+  const typingRef = useRef(false);
   const [canUndo, setCanUndo] = useState(false);
   const [htmlView, setHtmlView] = useState(false);
   const [htmlSrc, setHtmlSrc] = useState("");
@@ -88,8 +89,9 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     const host = hostRef.current;
     if (!host) return;
     undoStack.current.push(host.innerHTML);
-    if (undoStack.current.length > 40) undoStack.current.shift();
+    if (undoStack.current.length > 60) undoStack.current.shift();
     setCanUndo(true);
+    typingRef.current = false; // ket thuc 1 "dot go" — lan go ke tiep se chup moc moi
   }, []);
   const undo = useCallback(() => {
     const host = hostRef.current;
@@ -97,6 +99,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     const prev = undoStack.current.pop()!;
     host.innerHTML = prev;
     setCanUndo(undoStack.current.length > 0);
+    typingRef.current = false;
     emit();
   }, [emit]);
   useEffect(() => {
@@ -394,23 +397,37 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     emit();
     alert(`Đã tạo ${created} chỗ trống từ [ ].`);
   }, [emit, pushUndo]);
-  // Phím tắt: ⌘G/⌘D/⌘K tạo gap; ⌘⇧Z hoàn tác; ⌘⇧M gộp câu nhiều đáp án
+  // Phím tắt: Ctrl/⌘+Z hoàn tác (kể cả chữ vừa gõ); ⌘G/⌘D/⌘K tạo gap; ⌘⇧M gộp câu nhiều đáp án
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    const isTypingKey = (e: KeyboardEvent) =>
+      !(e.metaKey || e.ctrlKey || e.altKey) &&
+      (e.key.length === 1 || e.key === "Enter" || e.key === "Backspace" || e.key === "Delete" || e.key === "Tab");
     function onKey(e: KeyboardEvent) {
-      if (!(e.metaKey || e.ctrlKey)) return;
+      const mod = e.metaKey || e.ctrlKey;
       const k = e.key.toLowerCase();
-      if (e.shiftKey && k === "z") { e.preventDefault(); undo(); return; }
-      if (e.shiftKey && k === "m") { e.preventDefault(); groupSelectedAsMultiAnswer(); return; }
-      if (e.shiftKey) return;
-      if (k === "g") { e.preventDefault(); makeGap("TEXT"); }
-      else if (k === "d") { e.preventDefault(); makeGap("DROPDOWN"); }
-      else if (k === "k") { e.preventDefault(); makeGap("DRAG"); }
+      if (mod && !e.altKey && k === "z") {
+        // Ctrl/⌘+Z (và ⌘⇧Z) → hoàn tác theo mốc tự quản; hết mốc thì nhường undo mặc định của trình duyệt
+        if (undoStack.current.length > 0) { e.preventDefault(); undo(); }
+        return;
+      }
+      if (mod && e.shiftKey && k === "m") { e.preventDefault(); groupSelectedAsMultiAnswer(); return; }
+      if (mod && !e.shiftKey && k === "g") { e.preventDefault(); makeGap("TEXT"); return; }
+      if (mod && !e.shiftKey && k === "d") { e.preventDefault(); makeGap("DROPDOWN"); return; }
+      if (mod && !e.shiftKey && k === "k") { e.preventDefault(); makeGap("DRAG"); return; }
+      if (mod) return;
+      // Gõ thường: chụp 1 mốc cho mỗi "đợt gõ" để Ctrl+Z lùi được chữ vừa gõ
+      if (isTypingKey(e) && !typingRef.current) { pushUndo(); typingRef.current = true; }
     }
+    function onComposition() { if (!typingRef.current) { pushUndo(); typingRef.current = true; } }
     host.addEventListener("keydown", onKey);
-    return () => host.removeEventListener("keydown", onKey);
-  }, [makeGap, undo, groupSelectedAsMultiAnswer]);
+    host.addEventListener("compositionstart", onComposition);
+    return () => {
+      host.removeEventListener("keydown", onKey);
+      host.removeEventListener("compositionstart", onComposition);
+    };
+  }, [makeGap, undo, groupSelectedAsMultiAnswer, pushUndo]);
   function rememberCursor() {
     const host = hostRef.current;
     const sel = window.getSelection();
@@ -666,7 +683,7 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
           </button>
           <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImagePick} />
           <span className="mx-1 h-4 w-px bg-gray-300" />
-          <button type="button" onClick={undo} disabled={!canUndo} className="inline-flex items-center gap-1 rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-40" title="Hoàn tác thao tác chỗ trống gần nhất (⌘⇧Z)"><Undo2 size={13} />Hoàn tác</button>
+          <button type="button" onClick={undo} disabled={!canUndo} className="inline-flex items-center gap-1 rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-40" title="Hoàn tác — Ctrl+Z hoặc ⌘Z (cả thao tác chỗ trống lẫn chữ vừa gõ)"><Undo2 size={13} />Hoàn tác</button>
           <button type="button" onClick={renumber} className="rounded border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100">Đánh lại số</button>
           <button type="button" onClick={htmlView ? applyHtmlView : enterHtmlView} className="rounded border border-indigo-300 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100">{htmlView ? "▶ Về bài tập" : "⟨⟩ Xem mã HTML"}</button>
           <span className="ml-auto text-xs text-gray-500">Đang có <b>{count}</b> chỗ trống</span>
