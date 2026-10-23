@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Pencil, Trash2, Search, Loader2, Eye, Copy } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Loader2, Eye, Copy, Link2, Check } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { canEditContent } from "@/lib/permissions";
+
+const STUDENT_URL = "https://student.vestaedu.online";
 
 interface Exam {
   id: string; title: string; status: string; duration: number; totalScore: number;
@@ -18,6 +20,12 @@ export default function ExamListPage() {
   const [exams, setExams] = useState<Exam[]>([]); const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true); const [search, setSearch] = useState("");
   const [page, setPage] = useState(1); const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  function copyLink(id: string) {
+    const url = `${STUDENT_URL}/de-thi/${id}`;
+    try { navigator.clipboard?.writeText(url); } catch {}
+    setCopiedId(id); setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1500);
+  }
 
   const fetchExams = useCallback(async () => {
     setLoading(true);
@@ -63,6 +71,7 @@ export default function ExamListPage() {
                 <td className="px-5 py-3"><span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${exam.status === "PUBLISHED" ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>{exam.status === "PUBLISHED" ? "Published" : "Draft"}</span></td>
                 <td className="px-5 py-3 text-right"><div className="flex items-center justify-end gap-1">
                   <Link href={`/ngan-hang-de/de-thi/${exam.id}/cau-hoi`} title="Xem câu hỏi" className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Eye size={15} /></Link>
+                  <button onClick={() => copyLink(exam.id)} title="Copy link gửi học sinh" className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal">{copiedId === exam.id ? <Check size={15} className="text-green-600" /> : <Link2 size={15} />}</button>
                   {canEdit && (<>
                     <Link href={`/ngan-hang-de/de-thi/${exam.id}`} title="Sửa" className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Pencil size={15} /></Link>
                     <button onClick={() => handleDuplicate(exam.id)} title="Nhân bản" className="rounded-lg p-1.5 text-muted hover:bg-cream-dark hover:text-royal"><Copy size={15} /></button>
