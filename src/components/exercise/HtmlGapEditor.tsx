@@ -270,30 +270,28 @@ const HtmlGapEditor = forwardRef<HtmlGapEditorHandle, Props>(function HtmlGapEdi
     const host = hostRef.current;
     if (!host) return;
     const all = Array.from(host.querySelectorAll<HTMLElement>(".cloze, .clozedrop"));
-    if (!all.length) { alert("Không thấy .cloze / .clozedrop trong nội dung.\nHãy dán HTML từ LearnClick vào trước rồi bấm nút này."); return; }
-    const decodeDrop = (el: HTMLElement) => {
-      const href = el.getAttribute("href") || "";
-      let a = "";
-      if (href.startsWith("#")) { try { a = decodeURIComponent(href.slice(1)); } catch { a = href.slice(1); } }
-      a = a.replace(/(?:0i0)+$/, "").trim(); // bỏ đuôi mã hoá LearnClick "0i00i00i0" (giữ nguyên chữ \u0027i\u0027 cuối của từ Việt)
-      if (!a) a = (el.textContent || "").replace(/\s+/g, " ").trim();
-      return a;
-    };
+    if (!all.length) { alert("Khong thay .cloze / .clozedrop trong noi dung.\nHay dan HTML vao truoc roi bam nut nay."); return; }
     const dropEls = all.filter((el) => el.classList.contains("clozedrop"));
-    const pool = Array.from(new Set(dropEls.map(decodeDrop).filter(Boolean)));
-    if (!confirm(`Nhận diện ${all.length} chỗ trống (${dropEls.length} dropdown, ${all.length - dropEls.length} ô điền)?\nCác dropdown sẽ dùng chung ${pool.length} lựa chọn.`)) return;
+    if (!confirm(`Nhan dien ${all.length} cho trong (${dropEls.length} dropdown, ${all.length - dropEls.length} o dien)?`)) return;
     pushUndo();
     all.forEach((el) => {
       const id = String(nextId(host));
+      const answer = (el.textContent || "").replace(/\s+/g, " ").trim();
       if (el.classList.contains("clozedrop")) {
-        el.replaceWith(buildChipEl(id, "DROPDOWN", decodeDrop(el), pool.join(", ")));
+        const href = el.getAttribute("href") || "";
+        let raw = href.startsWith("#") ? href.slice(1) : href;
+        try { raw = decodeURIComponent(raw); } catch {}
+        const distract = raw.split("0i0").map((s) => s.replace(/\s+/g, " ").trim()).filter(Boolean);
+        const seen = new Set<string>();
+        const opts: string[] = [];
+        for (const o of [answer, ...distract]) { const k = o.toLowerCase(); if (o && !seen.has(k)) { seen.add(k); opts.push(o); } }
+        el.replaceWith(buildChipEl(id, "DROPDOWN", answer, opts.join(", ")));
       } else {
-        const ans = (el.textContent || "").replace(/\s+/g, " ").trim();
-        el.replaceWith(buildChipEl(id, "TEXT", ans, ""));
+        el.replaceWith(buildChipEl(id, "TEXT", answer, ""));
       }
     });
     emit();
-    alert('Đã nhận diện xong. Nếu muốn đánh số lại theo thứ tự, bấm "Đánh lại số".');
+    alert("Da nhan dien xong. Neu muon danh so lai theo thu tu, bam \"Danh lai so\".");
   }, [emit, pushUndo]);
 
   // ── Gộp các ô đã chọn thành 1 CÂU NHIỀU ĐÁP ÁN (không thứ tự) ──
