@@ -108,6 +108,7 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
   const skipSync = useRef(false);
   const [raw, setRaw] = useState<boolean>(() => /<!doctype|<html[\s>]|<\s*style[\s>]|data-vesta|data-layout-root/i.test(content || ""));
   const [rawText, setRawText] = useState<string>(content || "");
+  const [preview, setPreview] = useState(false);
   const rawRef = useRef(raw); rawRef.current = raw;
 
   const editor = useEditor({
@@ -196,13 +197,29 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
   if (!editor) return null;
 
   if (raw) {
+    const isVid = /id=["']playov["']|innerWidth\s*\/\s*1920/i.test(rawText);
     return (
       <div className="overflow-hidden rounded-xl border border-indigo-200 bg-white shadow-sm">
         <div className="flex items-center justify-between gap-2 border-b border-indigo-100 bg-indigo-50 px-3 py-2">
           <span className="text-xs font-bold text-indigo-700">📄 HTML nguyên — giữ đúng định dạng bài dán (không qua trình soạn)</span>
-          <button type="button" onClick={() => { skipSync.current = true; editor.commands.setContent(extractCSS(rawText).body); skipSync.current = false; setRaw(false); onChange?.(rawText); }} className="rounded border border-indigo-300 px-2 py-0.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100">Dùng trình soạn thường</button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setPreview((p) => !p)} className={`rounded border px-2 py-0.5 text-xs font-medium ${preview ? "border-indigo-400 bg-indigo-600 text-white" : "border-indigo-300 text-indigo-700 hover:bg-indigo-100"}`}>{preview ? "✏️ Ẩn xem thử" : "👁 Xem thử"}</button>
+            <button type="button" onClick={() => { if (/<!doctype|<html[\s>]|<\s*style[\s>]|id=["']playov["']/i.test(rawText) && !confirm("Chuyển sang trình soạn thường sẽ LÀM MẤT animation/script/định dạng của bài (vd video). Vẫn chuyển?")) return; skipSync.current = true; editor.commands.setContent(extractCSS(rawText).body); skipSync.current = false; setRaw(false); onChange?.(rawText); }} className="rounded border border-indigo-300 px-2 py-0.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100">Dùng trình soạn thường</button>
+          </div>
         </div>
-        <textarea value={rawText} onChange={(e) => { setRawText(e.target.value); onChange?.(e.target.value); }} spellCheck={false} rows={24} placeholder="Dán nguyên mã HTML bài viết vào đây (giữ style, layout)..." className="w-full resize-y p-4 font-mono text-xs outline-none" />
+        <textarea value={rawText} onChange={(e) => { setRawText(e.target.value); onChange?.(e.target.value); }} spellCheck={false} rows={preview ? 10 : 24} placeholder="Dán nguyên mã HTML bài viết vào đây (giữ style, layout)..." className="w-full resize-y p-4 font-mono text-xs outline-none" />
+        {preview && (
+          <div className="border-t border-indigo-100 bg-gray-50 p-3">
+            <div className="mb-1.5 text-[0.7rem] font-semibold text-gray-500">Xem thử — bấm ▶ trong khung để chạy (video/giọng đọc):</div>
+            {isVid ? (
+              <div style={{ position: "relative", width: "100%", maxWidth: "900px", margin: "0 auto", aspectRatio: "16 / 9", background: "#120709", borderRadius: "12px", overflow: "hidden" }}>
+                <iframe title="preview" srcDoc={rawText} allowFullScreen allow="autoplay; fullscreen" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "0" }} />
+              </div>
+            ) : (
+              <iframe title="preview" srcDoc={rawText} className="w-full rounded-lg border border-gray-200 bg-white" style={{ height: "70vh" }} />
+            )}
+          </div>
+        )}
         <p className="border-t border-gray-100 px-3 py-2 text-[0.7rem] text-gray-500">Bài này sẽ hiển thị đúng như HTML bạn dán (giống trang chia sẻ). Dùng cho bài thiết kế sẵn bằng HTML.</p>
       </div>
     );

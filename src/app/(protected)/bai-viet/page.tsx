@@ -170,9 +170,9 @@ export default function PostListPage() {
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex items-center justify-end gap-1">
-                      {post.status === "PUBLISHED" && (
+                      {(
                         <a href={`${LANDING_URL}/blog/${post.slug}`} target="_blank" rel="noopener noreferrer"
-                          className="rounded-lg p-2 text-muted hover:bg-cream-dark hover:text-royal" title="Xem trên website">
+                          className={`rounded-lg p-2 hover:bg-cream-dark hover:text-royal ${post.status === "PUBLISHED" ? "text-muted" : "text-amber-600"}`} title={post.status === "PUBLISHED" ? "Xem trên website" : "Xem thử (bản nháp)"}>
                           <ExternalLink size={15} />
                         </a>
                       )}
