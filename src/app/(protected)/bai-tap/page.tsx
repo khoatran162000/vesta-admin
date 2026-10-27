@@ -38,6 +38,9 @@ export default function ExerciseListPage() {
   const [q, setQ] = useState("");
   const [sortMode, setSortMode] = useState<"recent" | "az">("recent");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const isAdmin = user?.role === "ADMIN";
 
   useEffect(() => { loadData(); }, []);
   async function loadData() {
@@ -56,6 +59,27 @@ export default function ExerciseListPage() {
     const res = await api.delete(`/interactive/${id}`);
     if (!res.success) { alert(res.message || "Không có quyền thực hiện"); return; }
     loadData();
+  }
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  async function handleBulkDelete() {
+    const ids = [...selected];
+    if (!ids.length) return;
+    if (!confirm(`Xoá ${ids.length} bài tập đã chọn? Thao tác không thể hoàn tác.`)) return;
+    setBulkDeleting(true);
+    let okCount = 0, failCount = 0;
+    for (const id of ids) {
+      try { const res = await api.delete(`/interactive/${id}`); if (res.success) okCount++; else failCount++; } catch { failCount++; }
+    }
+    setBulkDeleting(false);
+    setSelected(new Set());
+    await loadData();
+    if (failCount) alert(`Đã xoá ${okCount} bài. ${failCount} bài không xoá được (có thể do quyền).`);
   }
   async function handleDuplicate(id: string) {
     setDupId(id);
@@ -91,6 +115,16 @@ export default function ExerciseListPage() {
         : new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
   }, [exercises, q, levelFilter, sortMode]);
 
+  const allShownSelected = shown.length > 0 && shown.every((ex) => selected.has(ex.id));
+  function toggleAll() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allShownSelected) shown.forEach((ex) => next.delete(ex.id));
+      else shown.forEach((ex) => next.add(ex.id));
+      return next;
+    });
+  }
+
   return (
     <div className="mx-auto max-w-[1100px]">
       <div className="mb-6 flex items-center justify-between">
@@ -122,6 +156,17 @@ export default function ExerciseListPage() {
           Bạn có quyền <b>xem bài tập + đáp án</b> và theo dõi kết quả học viên. Việc tạo/sửa nội dung do quản trị viên thực hiện.
         </div>
       )}
+      {isAdmin && selected.size > 0 && (
+        <div className="mb-3 flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm">
+          <span className="font-semibold text-red-700">Đã chọn {selected.size} bài</span>
+          <button onClick={() => setSelected(new Set())} className="text-xs font-medium text-gray-600 hover:underline">Bỏ chọn</button>
+          <button onClick={handleBulkDelete} disabled={bulkDeleting}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50">
+            {bulkDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            {bulkDeleting ? "Đang xoá…" : `Xoá ${selected.size} bài đã chọn`}
+          </button>
+        </div>
+      )}
       <div className="overflow-hidden rounded-xl border border-silver/30 bg-white">
         {loading ? (
           <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-gold" /></div>
@@ -130,6 +175,11 @@ export default function ExerciseListPage() {
         ) : (
           <table className="w-full text-left text-sm">
             <thead><tr className="border-b bg-cream">
+              {isAdmin && (
+                <th className="w-10 px-3 py-3 text-center">
+                  <input type="checkbox" checked={allShownSelected} onChange={toggleAll} title="Chọn tất cả" className="h-4 w-4 cursor-pointer accent-[#1B2A5C]" />
+                </th>
+              )}
               <th className="px-4 py-3 font-semibold text-royal">Tiêu đề</th>
               <th className="px-4 py-3 font-semibold text-royal">Loại</th>
               <th className="px-4 py-3 font-semibold text-royal">Số câu</th>
@@ -143,7 +193,12 @@ export default function ExerciseListPage() {
                 const count = typeof ex.questionCount === "number" ? ex.questionCount : (Array.isArray(qs) ? qs.length : 0);
                 const vis = VIS_LABELS[ex.visibility] || VIS_LABELS.PUBLIC;
                 return (
-                  <tr key={ex.id} className="border-b border-silver/10 hover:bg-cream/50">
+                  <tr key={ex.id} className={`border-b border-silver/10 hover:bg-cream/50 ${isAdmin && selected.has(ex.id) ? "bg-red-50/40" : ""}`}>
+                    {isAdmin && (
+                      <td className="w-10 px-3 py-3 text-center">
+                        <input type="checkbox" checked={selected.has(ex.id)} onChange={() => toggleOne(ex.id)} className="h-4 w-4 cursor-pointer accent-[#1B2A5C]" />
+                      </td>
+                    )}
                     <td className="px-4 py-3 font-medium text-[#1a1a2e]">
                       <Link href={`/bai-tap/${ex.id}/xem`} className="hover:text-royal hover:underline" title="Xem như học sinh (làm thử)">
                         {ex.title}
