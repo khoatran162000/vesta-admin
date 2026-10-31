@@ -17,7 +17,7 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Mark, mergeAttributes } from "@tiptap/core";
+import { Mark, Node, mergeAttributes } from "@tiptap/core";
 
 // Extension nhỏ: cho phép chỉnh CỠ CHỮ + MÀU CHỮ (gắn thuộc tính vào textStyle)
 const InlineStyle = Mark.create({
@@ -41,6 +41,24 @@ const InlineStyle = Mark.create({
   },
   renderHTML({ HTMLAttributes }: any) {
     return ["span", mergeAttributes(HTMLAttributes), 0];
+  },
+});
+
+// Node AUDIO / VIDEO: chèn trình phát (<audio>/<video> có controls)
+const AudioNode = Node.create({
+  name: "audioNode", group: "block", atom: true, selectable: true, draggable: true,
+  addAttributes() { return { src: { default: null } }; },
+  parseHTML() { return [{ tag: "audio[src]" }]; },
+  renderHTML({ HTMLAttributes }: any) {
+    return ["audio", mergeAttributes(HTMLAttributes, { controls: "controls", style: "width:100%;margin:12px 0;display:block" })];
+  },
+});
+const VideoNode = Node.create({
+  name: "videoNode", group: "block", atom: true, selectable: true, draggable: true,
+  addAttributes() { return { src: { default: null } }; },
+  parseHTML() { return [{ tag: "video[src]" }]; },
+  renderHTML({ HTMLAttributes }: any) {
+    return ["video", mergeAttributes(HTMLAttributes, { controls: "controls", playsinline: "true", style: "max-width:100%;margin:14px auto;display:block;border-radius:10px" })];
   },
 });
 
@@ -123,6 +141,7 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
       Highlight.configure({ multicolor: false }),
       InlineStyle,
       Youtube.configure({ width: 640, height: 360 }),
+      AudioNode, VideoNode,
       Table.configure({ resizable: false }),
       TableRow, TableCell, TableHeader,
     ],
@@ -180,13 +199,32 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
       try {
         const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
         const tk = localStorage.getItem("accessToken");
-        const r = await fetch(`${API}/upload/blog`, { method: "POST", headers: tk ? { Authorization: `Bearer ${tk}` } : {}, body: fd });
+        const r = await fetch(`${API}/posts/upload-image`, { method: "POST", headers: tk ? { Authorization: `Bearer ${tk}` } : {}, body: fd });
         if (r.ok) { const d = await r.json(); editor.chain().focus().setImage({ src: d.data?.url || d.url }).run(); }
         else alert("Lỗi upload ảnh.");
       } catch { alert("Lỗi kết nối server."); }
     }; input.click();
   }, [editor]);
   const addYoutube = useCallback(() => { const u = prompt("Nhập link YouTube:"); if (u && editor) editor.commands.setYoutubeVideo({ src: u }); }, [editor]);
+  const uploadMediaFile = useCallback((accept: string): Promise<string | null> => new Promise((resolve) => {
+    const input = document.createElement("input"); input.type = "file"; input.accept = accept;
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return resolve(null);
+      const fd = new FormData(); fd.append("media", file);
+      try {
+        const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+        const tk = localStorage.getItem("accessToken");
+        const r = await fetch(`${API}/posts/upload-media`, { method: "POST", headers: tk ? { Authorization: `Bearer ${tk}` } : {}, body: fd });
+        if (!r.ok) { alert("Lỗi tải file lên (kiểm tra định dạng/kích thước ≤ 45MB)."); return resolve(null); }
+        const d = await r.json(); const u = d.data?.url || d.url || "";
+        const base = API.replace(/\/api\/?$/, "");
+        resolve(u ? (u.startsWith("http") ? u : base + u) : null);
+      } catch { alert("Lỗi kết nối server."); resolve(null); }
+    };
+    input.click();
+  }), []);
+  const addAudioUpload = useCallback(async () => { if (!editor) return; const src = await uploadMediaFile("audio/*"); if (src) editor.chain().focus().insertContent({ type: "audioNode", attrs: { src } }).run(); }, [editor, uploadMediaFile]);
+  const addVideoUpload = useCallback(async () => { if (!editor) return; const src = await uploadMediaFile("video/*"); if (src) editor.chain().focus().insertContent({ type: "videoNode", attrs: { src } }).run(); }, [editor, uploadMediaFile]);
   const setLink = useCallback(() => {
     if (!editor) return;
     if (showLinkInput) { if (linkUrl) editor.chain().focus().extendMarkRange("link").setLink({ href: linkUrl }).run(); setShowLinkInput(false); setLinkUrl(""); }
@@ -291,6 +329,8 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
           <Btn onClick={addImageUpload} title="Tải ảnh lên từ máy tính">📷</Btn>
           <Btn onClick={addImage} title="Chèn ảnh từ đường link URL">🖼</Btn>
           <Btn onClick={addYoutube} title="Nhúng video YouTube vào bài viết">▶</Btn>
+          <Btn onClick={addAudioUpload} title="Tải audio (mp3) lên và chèn trình phát">🎵</Btn>
+          <Btn onClick={addVideoUpload} title="Tải video (mp4) lên và chèn trình phát">🎬</Btn>
           <Sep />
           <Btn active={editor.isActive("link")} onClick={setLink} title="Chèn hoặc sửa đường link">🔗</Btn>
           {editor.isActive("link") && <Btn onClick={() => editor.chain().focus().unsetLink().run()} title="Xoá đường link khỏi text đang chọn">✕</Btn>}
