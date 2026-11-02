@@ -13,6 +13,28 @@ function correctText(d: any): string {
   return "";
 }
 
+const TOKEN_RE = /\[\[gap:([^\]]+)\]\]/g;
+function looksLikeHtml(s: string) { return /<[a-z][\s\S]*>/i.test(s || ""); }
+function escHtml(s: string) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function normAns(s: any) { return String(s ?? "").trim().toLowerCase(); }
+// Dung lai noi dung bai, thay [[gap:N]] bang dap an cua HV (xanh dung / do sai; sai thi kem dap an dung)
+function buildStudentHtml(content: string, gaps: Record<string, any>, answers: Record<string, any>): string {
+  const base = looksLikeHtml(content) ? content : escHtml(content);
+  return base.replace(TOKEN_RE, (_m, id) => {
+    const g = gaps[String(id)] || {};
+    const accepted: string[] = Array.isArray(g.answers) ? g.answers : [];
+    const ans = answers?.[String(id)];
+    const has = ans !== undefined && ans !== null && String(ans).trim() !== "";
+    const okGap = has && accepted.some((a) => normAns(a) === normAns(ans));
+    const shown = has ? escHtml(String(ans)) : "(trống)";
+    const col = okGap ? "#166534" : "#b91c1c";
+    const bg = okGap ? "#dcfce7" : "#fee2e2";
+    const bd = okGap ? "#22c55e" : "#ef4444";
+    const key = !okGap && accepted.length ? `<span style="color:#166534;font-weight:600;font-size:.8em;margin-left:4px">(✓ ${escHtml(accepted.join(" / "))})</span>` : "";
+    return `<span style="display:inline-block;min-width:54px;text-align:center;padding:1px 8px;margin:0 2px;border:1.5px solid ${bd};border-radius:6px;background:${bg};color:${col};font-weight:700">${shown}</span>${key}`;
+  });
+}
+
 export default function ExerciseStatsPage() {
   const params = useParams();
   const id = params.id as string;
@@ -38,6 +60,10 @@ export default function ExerciseStatsPage() {
   if (loading) return <div className="flex justify-center py-20"><Loader2 size={28} className="animate-spin text-gold" /></div>;
   if (!data) return <div className="py-20 text-center text-muted">Không tải được thống kê.</div>;
   const { exercise, totalStudents, avgScore, students } = data;
+  const exContent: string = (exercise as any).content || "";
+  const exGaps: Record<string, any> | null = (() => {
+    try { const g = (exercise as any).gaps; if (!g) return null; const o = typeof g === "string" ? JSON.parse(g) : g; return o && Object.keys(o).length ? o : null; } catch { return null; }
+  })();
   return (
     <div className="mx-auto max-w-[900px]">
       <Link href="/bai-tap" className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted hover:text-royal">
@@ -94,11 +120,29 @@ export default function ExerciseStatsPage() {
       )}
       {viewing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setViewing(null)}>
-          <div className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
               <h3 className="font-bold text-royal">{viewing.studentName} — {viewing.score}%</h3>
               <button onClick={() => setViewing(null)} className="text-muted hover:text-royal"><X size={18} /></button>
             </div>
+            {exGaps && exContent && (
+              <div className="mb-4">
+                <div className="mb-1.5 text-xs font-semibold text-muted">Bài làm đầy đủ — đáp án của học viên được tô màu:</div>
+                <iframe
+                  title="Bài làm đầy đủ"
+                  srcDoc={/<!doctype|<html[\s>]/i.test(exContent)
+                    ? buildStudentHtml(exContent, exGaps, viewing.answers || {})
+                    : `<!doctype html><meta charset="utf-8"><base target="_blank"><style>body{margin:0;padding:14px;font-family:system-ui,Arial,sans-serif;color:#1a1a2e;font-size:14px;line-height:1.7}img{max-width:100%}table{max-width:100%;border-collapse:collapse}</style>${buildStudentHtml(exContent, exGaps, viewing.answers || {})}`}
+                  className="w-full rounded-lg border border-silver/20 bg-white"
+                  style={{ height: "440px" }}
+                  onLoad={(e) => { try { const f = e.currentTarget as HTMLIFrameElement; const d = f.contentDocument; if (d && d.body) f.style.height = Math.min(Math.max(d.documentElement.scrollHeight, d.body.scrollHeight) + 8, 440) + "px"; } catch {} }}
+                />
+                <div className="mt-2 flex flex-wrap gap-3 text-[0.7rem] text-muted">
+                  <span className="inline-flex items-center gap-1"><span className="inline-block h-3 w-3 rounded border border-green-500 bg-green-100" />Đúng</span>
+                  <span className="inline-flex items-center gap-1"><span className="inline-block h-3 w-3 rounded border border-red-500 bg-red-100" />Sai (kèm đáp án đúng)</span>
+                </div>
+              </div>
+            )}
             {Array.isArray(viewing.detail) && viewing.detail.length > 0 ? (
               <div className="space-y-2">
                 {viewing.detail.map((d: any, j: number) => {
