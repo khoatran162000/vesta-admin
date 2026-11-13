@@ -19,6 +19,8 @@ export default function StudentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [att, setAtt] = useState<any>(null);       // { data: rows[], stats }
   const [attLoading, setAttLoading] = useState(true);
+  const [exH, setExH] = useState<any>(null);       // bài tập: { data: rows[], stats }
+  const [exLoading, setExLoading] = useState(true);
   useEffect(() => {
     async function load() {
       try {
@@ -37,11 +39,22 @@ export default function StudentDetailPage() {
     }
     loadAtt();
   }, [studentId]);
+  useEffect(() => {
+    async function loadExH() {
+      try {
+        const res = await api.get(`/interactive/student/${studentId}/attempts`);
+        if (res.success) setExH(res);   // { success, data, stats }
+      } catch {} finally { setExLoading(false); }
+    }
+    loadExH();
+  }, [studentId]);
   if (loading) return <div className="flex justify-center py-20"><Loader2 size={24} className="animate-spin text-gold" /></div>;
   if (!data) return <p className="py-20 text-center text-muted">Không tìm thấy học viên.</p>;
   const { student, stats, recentAttempts } = data;
   const attRows = att?.data || [];
   const attStats = att?.stats || null;
+  const exRows = exH?.data || [];
+  const exStats = exH?.stats || null;
   return (
     <div className="mx-auto max-w-[900px]">
       {/* Header */}
@@ -136,6 +149,54 @@ export default function StudentDetailPage() {
           </tbody>
         </table>
         {recentAttempts.length === 0 && <p className="py-8 text-center text-muted">Chưa có lượt thi nào.</p>}
+      </div>
+
+      {/* Lịch sử làm bài tập */}
+      <div className="mt-8 mb-3 flex items-center justify-between">
+        <h3 className="font-display text-lg font-bold text-royal">Lịch sử làm bài tập</h3>
+        {exStats && exStats.totalExercises > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-full bg-royal/8 px-2.5 py-0.5 font-semibold text-royal">Đã làm: {exStats.totalExercises} bài</span>
+            <span className="rounded-full bg-blue-50 px-2.5 py-0.5 font-semibold text-blue-700">Tổng lượt: {exStats.totalAttempts}</span>
+            {exStats.avgBest !== null && (
+              <span className="rounded-full bg-green-50 px-2.5 py-0.5 font-semibold text-green-700">TB điểm cao nhất: {exStats.avgBest}%</span>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="card !p-0 overflow-hidden">
+        {exLoading ? (
+          <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin text-gold" /></div>
+        ) : exRows.length === 0 ? (
+          <p className="py-8 text-center text-muted">Chưa làm bài tập nào.</p>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-silver/20 bg-cream">
+                <th className="px-5 py-3 font-semibold text-royal">Bài tập</th>
+                <th className="px-5 py-3 font-semibold text-royal">Điểm cao nhất</th>
+                <th className="px-5 py-3 font-semibold text-royal">Điểm gần nhất</th>
+                <th className="px-5 py-3 font-semibold text-royal">Số lần</th>
+                <th className="px-5 py-3 font-semibold text-royal">Lần gần nhất</th>
+              </tr>
+            </thead>
+            <tbody>
+              {exRows.map((r: any) => (
+                <tr key={r.exerciseId} className="border-b border-silver/10 hover:bg-cream/50">
+                  <td className="px-5 py-3 font-medium text-[#1a1a2e]">{r.title}</td>
+                  <td className="px-5 py-3">
+                    {r.bestScore !== null ? (
+                      <span className={`font-semibold ${r.bestScore >= 70 ? "text-green-600" : r.bestScore >= 50 ? "text-amber-600" : "text-red-500"}`}>{r.bestScore}%</span>
+                    ) : "—"}
+                  </td>
+                  <td className="px-5 py-3 text-muted">{r.lastScore !== null ? `${r.lastScore}%` : "—"}</td>
+                  <td className="px-5 py-3 text-muted">{r.attempts}</td>
+                  <td className="px-5 py-3 text-muted">{new Date(r.lastAt).toLocaleDateString("vi-VN")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Lịch sử điểm danh */}
