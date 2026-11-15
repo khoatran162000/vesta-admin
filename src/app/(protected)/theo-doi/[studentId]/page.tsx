@@ -84,6 +84,8 @@ export default function StudentDetailPage() {
           </div>
         </div>
       )}
+      {stats.totalAttempts > 0 && (
+      <>
       {/* Stats */}
       <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-5">
         <div className="card flex items-center gap-3 !py-3">
@@ -150,6 +152,8 @@ export default function StudentDetailPage() {
         </table>
         {recentAttempts.length === 0 && <p className="py-8 text-center text-muted">Chưa có lượt thi nào.</p>}
       </div>
+      </>
+      )}
 
       {/* Lịch sử làm bài tập */}
       <div className="mt-8 mb-3 flex items-center justify-between">
@@ -159,7 +163,7 @@ export default function StudentDetailPage() {
             <span className="rounded-full bg-royal/8 px-2.5 py-0.5 font-semibold text-royal">Đã làm: {exStats.totalExercises} bài</span>
             <span className="rounded-full bg-blue-50 px-2.5 py-0.5 font-semibold text-blue-700">Tổng lượt: {exStats.totalAttempts}</span>
             {exStats.avgBest !== null && (
-              <span className="rounded-full bg-green-50 px-2.5 py-0.5 font-semibold text-green-700">TB điểm cao nhất: {exStats.avgBest}%</span>
+              <span className="rounded-full bg-green-50 px-2.5 py-0.5 font-semibold text-green-700">Điểm TB: {exStats.avgBest}%</span>
             )}
           </div>
         )}
@@ -174,7 +178,6 @@ export default function StudentDetailPage() {
             <thead>
               <tr className="border-b border-silver/20 bg-cream">
                 <th className="px-5 py-3 font-semibold text-royal">Bài tập</th>
-                <th className="px-5 py-3 font-semibold text-royal">Điểm cao nhất</th>
                 <th className="px-5 py-3 font-semibold text-royal">Điểm gần nhất</th>
                 <th className="px-5 py-3 font-semibold text-royal">Số lần</th>
                 <th className="px-5 py-3 font-semibold text-royal">Lần gần nhất</th>
@@ -183,13 +186,16 @@ export default function StudentDetailPage() {
             <tbody>
               {exRows.map((r: any) => (
                 <tr key={r.exerciseId} className="border-b border-silver/10 hover:bg-cream/50">
-                  <td className="px-5 py-3 font-medium text-[#1a1a2e]">{r.title}</td>
+                  <td className="px-5 py-3 font-medium">
+                    {r.lastAttemptId ? (
+                      <Link href={`/theo-doi/${studentId}/bai-tap/${r.lastAttemptId}`} className="text-royal hover:underline">{r.title}</Link>
+                    ) : <span className="text-[#1a1a2e]">{r.title}</span>}
+                  </td>
                   <td className="px-5 py-3">
-                    {r.bestScore !== null ? (
-                      <span className={`font-semibold ${r.bestScore >= 70 ? "text-green-600" : r.bestScore >= 50 ? "text-amber-600" : "text-red-500"}`}>{r.bestScore}%</span>
+                    {r.lastScore !== null ? (
+                      <span className={`font-semibold ${r.lastScore >= 70 ? "text-green-600" : r.lastScore >= 50 ? "text-amber-600" : "text-red-500"}`}>{r.lastScore}%</span>
                     ) : "—"}
                   </td>
-                  <td className="px-5 py-3 text-muted">{r.lastScore !== null ? `${r.lastScore}%` : "—"}</td>
                   <td className="px-5 py-3 text-muted">{r.attempts}</td>
                   <td className="px-5 py-3 text-muted">{new Date(r.lastAt).toLocaleDateString("vi-VN")}</td>
                 </tr>
