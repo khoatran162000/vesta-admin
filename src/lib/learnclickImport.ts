@@ -12,12 +12,9 @@ export interface ImportResult {
 }
 
 function sanitize(root: HTMLElement) {
+  // Bỏ <script> (không chạy qua innerHTML). GIỮ các handler on* (onclick...) —
+  // bài tập chỉ do ADMIN tự tạo, cần onclick cho nút "nghe" (speechSynthesis).
   root.querySelectorAll("script").forEach((el) => el.remove());
-  root.querySelectorAll("*").forEach((el) => {
-    for (const attr of Array.from(el.attributes)) {
-      if (/^on/i.test(attr.name)) el.removeAttribute(attr.name);
-    }
-  });
 }
 
 function parseAnswers(raw: string): string[] {
