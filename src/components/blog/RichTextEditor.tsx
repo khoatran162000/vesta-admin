@@ -71,6 +71,10 @@ interface RichTextEditorProps {
 
 type ViewMode = "visual" | "html" | "css";
 
+// Dấu hiệu nội dung là HTML "đầy đủ" (dán nguyên trang: có style/script/canvas/doctype...) —
+// phải giữ ở chế độ "HTML nguyên", KHÔNG cho trình soạn thường parse (sẽ làm phẳng, mất script/canvas).
+const FULL_HTML_SIG = /<!doctype|<html[\s>]|<\s*style[\s>]|<\s*script[\s>]|<\s*canvas[\s>]|data-vesta|data-layout-root|id=["']playov["']/i;
+
 /* ────────────────────────── CSS extract/inject ────────────────────────── */
 function extractCSS(html: string): { css: string; body: string } {
   const m = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
@@ -124,7 +128,7 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
   const [htmlSource, setHtmlSource] = useState("");
   const [cssSource, setCssSource] = useState("");
   const skipSync = useRef(false);
-  const [raw, setRaw] = useState<boolean>(() => /<!doctype|<html[\s>]|<\s*style[\s>]|data-vesta|data-layout-root/i.test(content || ""));
+  const [raw, setRaw] = useState<boolean>(() => FULL_HTML_SIG.test(content || ""));
   const [rawText, setRawText] = useState<string>(content || "");
   const [preview, setPreview] = useState(false);
   const rawRef = useRef(raw); rawRef.current = raw;
@@ -163,7 +167,7 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
   }, [content, editor]);
   // Mở lại bài đã lưu dạng HTML nguyên: content tới sau mount & là mã VESTA -> vào chế độ HTML nguyên
   useEffect(() => {
-    if (content && !rawRef.current && /<!doctype|<html[\s>]|<\s*style[\s>]|data-vesta|data-layout-root/i.test(content)) {
+    if (content && !rawRef.current && FULL_HTML_SIG.test(content)) {
       setRawText(content);
       setRaw(true);
     }
@@ -242,7 +246,7 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
           <span className="text-xs font-bold text-indigo-700">📄 HTML nguyên — giữ đúng định dạng bài dán (không qua trình soạn)</span>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => setPreview((p) => !p)} className={`rounded border px-2 py-0.5 text-xs font-medium ${preview ? "border-indigo-400 bg-indigo-600 text-white" : "border-indigo-300 text-indigo-700 hover:bg-indigo-100"}`}>{preview ? "✏️ Ẩn xem thử" : "👁 Xem thử"}</button>
-            <button type="button" onClick={() => { if (/<!doctype|<html[\s>]|<\s*style[\s>]|id=["']playov["']/i.test(rawText) && !confirm("Chuyển sang trình soạn thường sẽ LÀM MẤT animation/script/định dạng của bài (vd video). Vẫn chuyển?")) return; skipSync.current = true; editor.commands.setContent(extractCSS(rawText).body); skipSync.current = false; setRaw(false); onChange?.(rawText); }} className="rounded border border-indigo-300 px-2 py-0.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100">Dùng trình soạn thường</button>
+            <button type="button" onClick={() => { if (FULL_HTML_SIG.test(rawText) && !confirm("Chuyển sang trình soạn thường sẽ LÀM MẤT animation/script/định dạng của bài (vd video). Vẫn chuyển?")) return; skipSync.current = true; editor.commands.setContent(extractCSS(rawText).body); skipSync.current = false; setRaw(false); onChange?.(rawText); }} className="rounded border border-indigo-300 px-2 py-0.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100">Dùng trình soạn thường</button>
           </div>
         </div>
         <textarea value={rawText} onChange={(e) => { setRawText(e.target.value); onChange?.(e.target.value); }} spellCheck={false} rows={preview ? 10 : 24} placeholder="Dán nguyên mã HTML bài viết vào đây (giữ style, layout)..." className="w-full resize-y p-4 font-mono text-xs outline-none" />
@@ -271,7 +275,7 @@ export function RichTextEditor({ content = "", onChange, placeholder = "Bắt đ
         const cd = e.clipboardData; if (!cd) return;
         const html = cd.getData("text/html") || "";
         const text = cd.getData("text/plain") || "";
-        const SIG = /data-vesta|data-layout-root|<!doctype|<html[\s>]|<\s*style[\s>]/i;
+        const SIG = FULL_HTML_SIG;
         const rawHtml = SIG.test(text) ? text : (SIG.test(html) ? html : "");
         if (rawHtml) {
           e.preventDefault(); e.stopPropagation();
